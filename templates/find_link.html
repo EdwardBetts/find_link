@@ -1,0 +1,20 @@
+<html>
+<head>
+<title>{{title}} - links</title>
+</head>
+<body>
+
+<form id="upload" method=post enctype="multipart/form-data" action="http://en.wikipedia.org/w/index.php?title={{urlquote(title)}}&action=edit" style="display:inline">
+<input type="hidden" name="wpTextbox1" value="{{ content }}">
+<input type="hidden" name="wpSummary" value="{{summary}}">
+<input type="hidden" value="{{start_time}}" name="wpStarttime" />
+<input type="hidden" value="{{timestamp}}" name="wpEdittime" />
+<input type="hidden" name="wpDiff" value="wpDiff">
+<input type="hidden" value="1" name="wpMinoredit">
+
+<input id="thebutton" type="submit" name="wpDiff" value="Show changes"/>
+</form>
+<body onload="document.getElementById('thebutton').click();">
+
+</body>
+</html>

@@ -1,0 +1,48 @@
+<html>
+<head>
+<title>
+{% if q %}
+    {{ q }} - Find link
+{% else %}
+    Find link
+{% endif %}
+</title>
+<link rel="shortcut icon" href="{{url_for('static', filename='Link_edit.png')}}" />
+</head>
+<style>
+span.searchmatch { font-weight: bold; }
+.flash { font-weight: bold; }
+</style>
+<body>
+<h1>Find link</h1>
+{% if message %}
+  <span class="flash">{{ message }}</span><br>
+{% endif %}
+<form action="{{url_for('index')}}">
+<input name="q" value="{{ q }}">
+<input type="submit" value="search">
+{% if q %}
+    {% set esc_q = urlquote(q.replace(' ', '_')) %}
+    <a href="http://en.wikipedia.org/wiki/{{esc_q}}">view article</a>
+{% endif %}
+</form>
+{% if q %}
+    {% if longer_titles %}
+        Longer titles found:
+        {% for t in longer_titles %}
+            {% set esc_title = urlquote(t.replace(' ', '_')) %}
+            <a href="{{ url_for('findlink', q=t.replace(' ', '_'))}}">{{t}}</a> (<a href="http://en.wikipedia.org/wiki/{{esc_title}}">view</a>){{ ',' if not loop.last }}
+        {% endfor %}<p>
+    {% endif %}
+    searching for {{ q }} {{ results | length }} found ({{totalhits}} total)<p>
+    {% for doc in results %}
+        {% set esc_title = urlquote(doc.title.replace(' ', '_')) %}
+        <a href="{{url_for('index')}}?q={{urlquote(q)}}&title={{urlquote(doc.title)}}">{{doc.title}}</a> ({{commify(doc.wordcount)}} words)
+        <a href="http://en.wikipedia.org/wiki/{{esc_title}}">view article</a>
+        <a href="{{url_for('findlink', q=doc.title.replace(' ', '_'))}}">find links to article</a>
+        <br>
+        <blockquote>{{ doc.snippet }}</blockquote>
+    {% endfor %}
+{% endif %}
+</body>
+</html>
