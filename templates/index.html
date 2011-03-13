@@ -8,6 +8,7 @@
 {% endif %}
 </title>
 <link rel="shortcut icon" href="{{url_for('static', filename='Link_edit.png')}}" />
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.4.4/jquery.min.js"></script> 
 </head>
 <style>
 span.searchmatch { font-weight: bold; }
@@ -23,6 +24,15 @@ span.searchmatch { font-weight: bold; }
 <input type="submit" value="search">
 {% if q %}
     {% set esc_q = urlquote(q.replace(' ', '_')) %}
+    <script>
+    api_url = 'http://en.wikipedia.org/w/api.php?format=json&callback=?&';
+    function get_redirects () {
+        url = api_url + "action=query&list=backlinks&blfilterredir=redirects&bllimit=500&blnamespace=0&bltitle={{esc_q}}";
+        $.getJSON(url, function(data) {
+            $('#result').html('<p>backlinks:' + data.query.backlinks + '</p>');
+        });
+    }
+    </script>
     <a href="http://en.wikipedia.org/wiki/{{esc_q}}">view article</a>
 {% endif %}
 </form>
@@ -35,11 +45,15 @@ span.searchmatch { font-weight: bold; }
         {% endfor %}<p>
     {% endif %}
     searching for {{ q }} {{ results | length }} found ({{totalhits}} total)<p>
+    {% if request.args.get('dev') %} 
+        <a href="javascript:get_redirects()">redirect here</a><br>
+        <div id="results"></div>
+    {% endif %}
     {% for doc in results %}
         {% set esc_title = urlquote(doc.title.replace(' ', '_')) %}
-        <a href="{{url_for('index')}}?q={{urlquote(q)}}&title={{urlquote(doc.title)}}">{{doc.title}}</a> ({{commify(doc.wordcount)}} words)
-        <a href="http://en.wikipedia.org/wiki/{{esc_title}}">view article</a>
-        <a href="{{url_for('findlink', q=doc.title.replace(' ', '_'))}}">find links to article</a>
+        <a href="{{url_for('index')}}?q={{urlquote(q)}}&title={{urlquote(doc.title)}}" target="_blank">{{doc.title}}</a> ({{commify(doc.wordcount)}} words)
+        <a href="http://en.wikipedia.org/wiki/{{esc_title}}" target="_blank">view article</a>
+        <a href="{{url_for('findlink', q=doc.title.replace(' ', '_'))}}" target="_blank">find links to article</a>
         <br>
         <blockquote>{{ doc.snippet }}</blockquote>
     {% endfor %}

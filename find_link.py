@@ -1,15 +1,10 @@
-from flask import Flask, render_template, request, make_response, Response, g, Markup, redirect, url_for, abort
-import urllib, json, os, re
+from flask import Flask, render_template, request, Markup, redirect, url_for
+import urllib, json, re, os
 from datetime import datetime
-from pprint import pformat
-
-class AppURLopener(urllib.FancyURLopener):
-    version = "find-link/2.0 (contact: edwardbetts@gmail.com)"
-
-urllib._urlopener = AppURLopener()
 
 app = Flask(__name__)
-key = open('key').read()
+last_slash = __file__.rfind('/')
+key = open(__file__[:last_slash+1] + 'key').read()
 if key[-1] == '\n':
     key = key[:-1]
 Flask.secret_key = key
@@ -36,15 +31,29 @@ re_space_or_dash = re.compile('[ -]')
 def is_title_case(phrase):
     return all(term[0].isupper() and term[1:].islower() for term in re_space_or_dash.split(phrase))
 
-cache_dir = '/home/edward/lib/cache/findlink/'
+def test_is_title_case():
+    assert is_title_case('Test')
+    assert is_title_case('Test Test')
+    assert not is_title_case('test')
+    assert not is_title_case('TEST TEST')
+    assert not is_title_case('test test')
+    assert not is_title_case('tEst Test')
+
+class AppURLopener(urllib.FancyURLopener):
+    version = "find-link/2.0 (contact: edwardbetts@gmail.com)"
+
+urllib._urlopener = AppURLopener()
+
+def urlquote(s):
+    return urllib.quote_plus(s.encode('utf-8'))
+
+def test_is_title_case():
+    assert urlquote('test') == 'test'
+    assert urlquote('test test') == 'test+test'
+    assert urlquote(u'na\xefve') == 'na%C3%AFve'
+
 def web_get(params):
-    url = query_url + params
-    ret = json.load(urllib.urlopen(url))
-    return ret
-    if 'warnings' in ret:
-        print 'warnings:', ret['warnings']
-    if 'query-continue' in ret:
-        print 'query-continue:', ret['query-continue']
+    return json.load(urllib.urlopen(query_url + params))
 
 def wiki_search(q):
     search_url = search_params + urlquote('"%s"' % q)
@@ -84,6 +93,12 @@ def page_links(titles):
 def is_disambig(doc):
     return any('disambig' in t or t.endswith('dis') for t in (t['title'].lower() for t in doc.get('templates', [])))
 
+def test_is_disambig():
+    assert not is_disambig({})
+    assert is_disambig({ 'templates': [ {'title': 'disambig'}, {'title': 'magic'}] })
+    assert is_disambig({ 'templates': [ {'title': 'geodis'}] })
+    assert is_disambig({ 'templates': [ {'title': 'Disambig'}] })
+
 def find_disambig(titles):
     titles = list(titles)
     assert titles
@@ -107,7 +122,12 @@ def norm(s):
     s = re_non_letter.sub('', s).lower()
     return s[:-1] if s[-1] == 's' else s
 
-def wiki_redirects(q):
+def test_norm():
+    assert norm('X') == 'x'
+    assert norm('Tables') == 'table'
+    assert norm('Tables!!!') == 'table'
+
+def wiki_redirects(q): # pages that link here
     docs = web_get(redirect_params + urlquote(q))['query']['backlinks']
     assert all('redirect' in doc for doc in docs)
     return (doc['title'] for doc in docs)
@@ -123,9 +143,6 @@ def wiki_backlink(q):
     articles = set(doc['title'] for doc in docs if 'redirect' not in doc)
     redirects = set(doc['title'] for doc in docs if 'redirect' in doc)
     return (articles, redirects)
-
-def urlquote(s):
-    return urllib.quote_plus(s.encode('utf-8'))
 
 def get_page(title, q):
     ret = web_get(content_params + urlquote(title))
@@ -181,7 +198,7 @@ def get_page(title, q):
 def findlink(q, title=None, message=None):
     q_trim = q.strip('_')
     if ' ' in q or q != q_trim:
-        return redirect(url_for('findlink', q=q.replace(' ', '_').strip('_')))
+        return redirect(url_for('findlink', q=q.replace(' ', '_').strip('_'), message=message))
     q = q.replace('_', ' ').strip()
     (info, redirect_to) = get_wiki_info(q)
     if 'missing' in info:
