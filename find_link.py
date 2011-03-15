@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, Markup, redirect, url_for
 import urllib, json, re, os
 from datetime import datetime
+import py.test
 
 app = Flask(__name__)
 last_slash = __file__.rfind('/')
@@ -9,6 +10,7 @@ if key[-1] == '\n':
     key = key[:-1]
 Flask.secret_key = key
 query_url = 'http://en.wikipedia.org/w/api.php?format=json&action=query&'
+#srprop = 'size|wordcount|timestamp|score|snippet|titlesnippet|sectionsnippet|sectiontitle|redirectsnippet|redirecttitle|hasrelated'
 search_params = 'list=search&srwhat=text&srlimit=50&srsearch='
 backlink_params = 'list=backlinks&bllimit=500&blnamespace=0&bltitle='
 redirect_params = 'list=backlinks&blfilterredir=redirects&bllimit=500&blnamespace=0&bltitle='
@@ -144,15 +146,42 @@ def wiki_backlink(q):
     redirects = set(doc['title'] for doc in docs if 'redirect' in doc)
     return (articles, redirects)
 
-def get_page(title, q):
-    ret = web_get(content_params + urlquote(title))
-    rev = ret['query']['pages'].values()[0]['revisions'][0]
-    content = rev['*']
-    timestamp = rev['timestamp']
-    timestamp = ''.join(c for c in timestamp if c.isdigit())
+def test_find_link_in_content():
+    with py.test.raises(NoMatch):
+        find_link_in_content('foo', 'bar')
 
+    with py.test.raises(NoMatch):
+        input_content = 'Able to find this test\n\nphrase in an article.'
+        find_link_in_content('test phrase', input_content)
+
+    with py.test.raises(NoMatch):
+        input_content = 'Able to find this test  \n  \n  phrase in an article.'
+        find_link_in_content('test phrase', input_content)
+
+    content = [
+        'Able to find this test phrase in an article.',
+        'Able to find this test  phrase in an article.',
+        'Able to find this test\n  phrase in an article.',
+        'Able to find this test  \nphrase in an article.',
+        'Able to find this test\nphrase in an article.',
+        'Able to find this test-phrase in an article.', 
+        'Able to find this test PHRASE in an article.', 
+        'Able to find this TEST PHRASE in an article.', 
+        'Able to find this test\nPhrase in an article.', 
+        'Able to find this [[test]] phrase in an article.',
+        'Able to find this TEST [[PHRASE]] in an article.', 
+        'Able to find this testphrase in an article.']
+
+    for input_content in content:
+        (c, r) = find_link_in_content('test phrase', input_content)
+        assert c == 'Able to find this [[test phrase]] in an article.'
+        assert r == 'test phrase'
+
+class NoMatch(Exception):
+    pass
+
+def find_link_in_content(q, content):
     re_link = re.compile('([%s%s])%s' % (q[0].lower(), q[0].upper(), q[1:]))
-
     m = re_link.search(content)
     if m:
         replacement = m.group(1) + q[1:]
@@ -160,12 +189,12 @@ def get_page(title, q):
         re_link = re.compile('(%s)%s' % (q[0], q[1:]), re.I)
         m = re_link.search(content)
         if m:
-            if any(c.isupper() for c in q[1:]):
+            if any(c.isupper() for c in q[1:]) or m.group(0) == m.group(0).upper():
                 replacement = q
             else:
                 replacement = q.lower() if is_title_case(m.group(0)) else m.group(1) + q[1:]
     if not m and ' ' in q:
-        re_link = re.compile('(%s)%s' % (q[0], q[1:].replace(',', ',?').replace(' ', '[- ]?')), re.I)
+        re_link = re.compile('(%s)%s' % (q[0], q[1:].replace(',', ',?').replace(' ', ' *[-\n]? *')), re.I)
         m = re_link.search(content)
         if m:
             if any(c.isupper() for c in q[1:]):
@@ -177,13 +206,27 @@ def get_page(title, q):
         re_link = re.compile(pat, re.I)
         m = re_link.search(content)
         if m:
-            if any(c.isupper() for c in q[1:]):
+            if any(c.isupper() for c in q[1:]) or m.group(0) == m.group(0).upper():
                 replacement = q
             else:
                 replacement = q.lower() if is_title_case(m.group(0)) else m.group(1) + q[1:]
     if not m:
-        return None
+        raise NoMatch
     content = re_link.sub(lambda m: "[[%s]]" % replacement, content, count=1)
+    return (content, replacement)
+
+def get_page(title, q):
+    ret = web_get(content_params + urlquote(title))
+    rev = ret['query']['pages'].values()[0]['revisions'][0]
+    content = rev['*']
+    timestamp = rev['timestamp']
+    timestamp = ''.join(c for c in timestamp if c.isdigit())
+
+    try:
+        (content, replacement) = find_link_in_content(q, content)
+    except NoMatch:
+        return None
+
     summary = "link [[%s]] using [[User:Edward/Find link|Find link]]" % replacement
     #text = "title: %s\nq: %s\nsummary: %s\ntimestamp: %s\n\n%s" % (title, q, timestamp, summary, content)
 
@@ -196,6 +239,15 @@ def get_page(title, q):
 
 @app.route("/<q>")
 def findlink(q, title=None, message=None):
+    def case_flip(s):
+        if s.islower():
+            return s.upper()
+        if s.isupper():
+            return s.lower()
+        return s
+    def case_flip_first(s):
+        return case_flip(s[0]) + s[1:]
+
     q_trim = q.strip('_')
     if ' ' in q or q != q_trim:
         return redirect(url_for('findlink', q=q.replace(' ', '_').strip('_'), message=message))
@@ -223,9 +275,17 @@ def findlink(q, title=None, message=None):
         search = [doc for doc in search if doc['title'] not in disambig]
     # and (doc['title'] not in links or this_title not in links[doc['title']])]
         for doc in search:
+            without_markup = doc['snippet'].replace("<span class='searchmatch'>", "").replace("</span>", "").replace('  ', ' ')
+            #doc['without_markup'] = without_markup
+            doc['match'] = None
+            if q in without_markup or case_flip_first(q) in without_markup:
+                doc['match'] = 'exact'
+            elif q.lower() in without_markup.lower():
+                doc['match'] = 'case_mismatch'
             doc['snippet'] = Markup(doc['snippet'])
     return render_template('index.html', q=q, totalhits=totalhits, message=message, results=search, urlquote=urlquote,
-            commify=commify, longer_titles=all_pages(this_title), norm_match_redirect=norm_match_redirect)
+            commify=commify, longer_titles=all_pages(this_title), norm_match_redirect=norm_match_redirect,
+            case_flip_first=case_flip_first)
 
 @app.route("/favicon.ico")
 def favicon():

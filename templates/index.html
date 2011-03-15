@@ -11,6 +11,9 @@
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.4.4/jquery.min.js"></script> 
 </head>
 <style>
+span.exact { padding: 2px; background: green; color: white; font-weight: bold; }
+span.nomatch { padding: 2px; background: red; color: white; font-weight: bold; }
+span.case_mismatch { padding: 2px; background: orange; color: white; font-weight: bold; }
 span.searchmatch { font-weight: bold; }
 .flash { font-weight: bold; }
 </style>
@@ -45,13 +48,21 @@ span.searchmatch { font-weight: bold; }
         {% endfor %}<p>
     {% endif %}
     searching for {{ q }} {{ results | length }} found ({{totalhits}} total)<p>
+    {% if q[0].isalpha(): %}
+        {% set alt_case = case_flip_first(q) %}
+        alternate case: <a href="{{url_for('findlink', q=urlquote(alt_case.replace(' ', '_')))}}">{{alt_case}}</a><p>
+    {% endif %}
     {% if request.args.get('dev') %} 
         <a href="javascript:get_redirects()">redirect here</a><br>
         <div id="results"></div>
     {% endif %}
     {% for doc in results %}
+        {# <pre>{{ doc | pprint() }}</pre> #}
         {% set esc_title = urlquote(doc.title.replace(' ', '_')) %}
         <a href="{{url_for('index')}}?q={{urlquote(q)}}&title={{urlquote(doc.title)}}" target="_blank">{{doc.title}}</a> ({{commify(doc.wordcount)}} words)
+        {% if doc.match == 'exact' %}<span class="exact">exact match in snippet</span>{% endif %}
+        {% if doc.match == 'case_mismatch' %}<span class="case_mismatch">case mismatch in snippet</span>{% endif %}
+        {% if not doc.match %}<span class="nomatch">no match in snippet</span>{% endif %}
         <a href="http://en.wikipedia.org/wiki/{{esc_title}}" target="_blank">view article</a>
         <a href="{{url_for('findlink', q=doc.title.replace(' ', '_'))}}" target="_blank">find links to article</a>
         <br>
