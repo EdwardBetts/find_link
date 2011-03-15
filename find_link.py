@@ -1,7 +1,6 @@
 from flask import Flask, render_template, request, Markup, redirect, url_for
 import urllib, json, re, os
 from datetime import datetime
-import py.test
 
 app = Flask(__name__)
 last_slash = __file__.rfind('/')
@@ -147,6 +146,7 @@ def wiki_backlink(q):
     return (articles, redirects)
 
 def test_find_link_in_content():
+    import py.test
     with py.test.raises(NoMatch):
         find_link_in_content('foo', 'bar')
 
