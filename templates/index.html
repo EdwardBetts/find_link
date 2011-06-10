@@ -48,7 +48,7 @@ span.searchmatch { font-weight: bold; }
         {% endfor %}<p>
     {% endif %}
     searching for {{ q }} {{ results | length }} found ({{totalhits}} total)<p>
-    {% if q[0].isalpha(): %}
+    {% if q[0].isalpha() and results: %}
         {% set alt_case = case_flip_first(q) %}
         alternate case: <a href="{{url_for('findlink', q=urlquote(alt_case.replace(' ', '_')))}}">{{alt_case}}</a><p>
     {% endif %}
