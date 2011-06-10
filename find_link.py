@@ -11,6 +11,7 @@ Flask.secret_key = key
 query_url = 'http://en.wikipedia.org/w/api.php?format=json&action=query&'
 #srprop = 'size|wordcount|timestamp|score|snippet|titlesnippet|sectionsnippet|sectiontitle|redirectsnippet|redirecttitle|hasrelated'
 search_params = 'list=search&srwhat=text&srlimit=50&srsearch='
+new_page_params = 'list=recentchanges&rclimit=50&rctype=new&rcnamespace=0&rcshow=!redirect'
 backlink_params = 'list=backlinks&bllimit=500&blnamespace=0&bltitle='
 redirect_params = 'list=backlinks&blfilterredir=redirects&bllimit=500&blnamespace=0&bltitle='
 content_params = 'prop=revisions&rvprop=content|timestamp&titles='
@@ -269,6 +270,17 @@ def findlink(q, title=None, message=None):
         a2, r2 = wiki_backlink(r)
         articles.update(a2)
         redirects.update(r2)
+    
+    longer = all_pages(this_title)
+    lq = q.lower()
+    for doc in search:
+        lt = doc['title'].lower()
+        if lq != lt and lq in lt:
+            articles.add(doc['title'])
+            (more_articles, more_redirects) = wiki_backlink(doc['title'])
+            articles.update(more_articles)
+            longer.append(doc['title'])
+
     search = [doc for doc in search if doc['title'] not in articles and doc['title'] not in cm]
     if search:
         disambig = set(find_disambig([doc['title'] for doc in search]))
@@ -284,12 +296,17 @@ def findlink(q, title=None, message=None):
                 doc['match'] = 'case_mismatch'
             doc['snippet'] = Markup(doc['snippet'])
     return render_template('index.html', q=q, totalhits=totalhits, message=message, results=search, urlquote=urlquote,
-            commify=commify, longer_titles=all_pages(this_title), norm_match_redirect=norm_match_redirect,
+            commify=commify, longer_titles=longer, norm_match_redirect=norm_match_redirect,
             case_flip_first=case_flip_first)
 
 @app.route("/favicon.ico")
 def favicon():
     return redirect(url_for('static', filename='Link_edit.png'))
+
+@app.route("/new_pages")
+def newpages():
+    np = web_get(new_page_params)['query']['recentchanges']
+    return render_template('new_pages.html', new_pages=np)
 
 @app.route("/find_link/<q>")
 def bad_url(q):

@@ -1,0 +1,15 @@
+<html>
+<head>
+<title>New pages</title>
+</head>
+<body>
+<h1>New pages</h1>
+<ul>
+{% for p in new_pages %}
+{% if '(' not in p.title %}
+    <li><a href="{{ url_for('findlink', q=p.title.replace(' ', '_'))}}">{{p.title}}</a>
+{% endif %}
+{% endfor %}
+</ul>
+</body>
+</html>
