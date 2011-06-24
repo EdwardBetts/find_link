@@ -122,7 +122,7 @@ def find_disambig(titles):
 re_non_letter = re.compile('\W', re.U)
 def norm(s):
     s = re_non_letter.sub('', s).lower()
-    return s[:-1] if s[-1] == 's' else s
+    return s[:-1] if s and s[-1] == 's' else s
 
 def test_norm():
     assert norm('X') == 'x'
@@ -264,13 +264,15 @@ def findlink(q, title=None, message=None):
     cm = set(categorymembers(q))
     norm_q = norm(q)
     norm_match_redirect = set(r for r in redirects if norm(r) == norm_q)
+    longer_redirect = set(r for r in redirects if r.lower().startswith(q.lower()))
+
     articles.add(this_title)
-    for r in norm_match_redirect:
+    for r in norm_match_redirect | longer_redirect:
         articles.add(r)
         a2, r2 = wiki_backlink(r)
         articles.update(a2)
         redirects.update(r2)
-    
+
     longer = all_pages(this_title)
     lq = q.lower()
     for doc in search:
@@ -294,6 +296,13 @@ def findlink(q, title=None, message=None):
                 doc['match'] = 'exact'
             elif q.lower() in without_markup.lower():
                 doc['match'] = 'case_mismatch'
+            if doc['match'] != 'exact' and q.endswith('y'):
+                if q[:-1] in without_markup or case_flip_first(q[:-1]) in without_markup:
+                    doc['match'] = 'exact'
+            elif doc['match'] is None:
+                if q[:-1].lower() in without_markup.lower():
+                    doc['match'] = 'case_mismatch'
+
             doc['snippet'] = Markup(doc['snippet'])
     return render_template('index.html', q=q, totalhits=totalhits, message=message, results=search, urlquote=urlquote,
             commify=commify, longer_titles=longer, norm_match_redirect=norm_match_redirect,
