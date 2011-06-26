@@ -264,7 +264,7 @@ def findlink(q, title=None, message=None):
     cm = set(categorymembers(q))
     norm_q = norm(q)
     norm_match_redirect = set(r for r in redirects if norm(r) == norm_q)
-    longer_redirect = set(r for r in redirects if r.lower().startswith(q.lower()))
+    longer_redirect = set(r for r in redirects if q.lower() in r.lower()
 
     articles.add(this_title)
     for r in norm_match_redirect | longer_redirect:
