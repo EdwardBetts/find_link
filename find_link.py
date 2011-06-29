@@ -283,7 +283,8 @@ def findlink(q, title=None, message=None):
             articles.add(doc['title'])
             (more_articles, more_redirects) = wiki_backlink(doc['title'])
             articles.update(more_articles)
-            longer.append(doc['title'])
+            if doc['title'] not in longer:
+                longer.append(doc['title'])
 
     search = [doc for doc in search if doc['title'] not in articles and doc['title'] not in cm]
     if search:
