@@ -19,7 +19,8 @@ link_params = 'prop=links&pllimit=500&plnamespace=0&titles='
 templates_params = 'prop=templates&tllimit=500&tlnamespace=10&titles='
 allpages_params = 'list=allpages&apnamespace=0&apfilterredir=nonredirects&aplimit=500&apprefix='
 info_params = 'action=query&prop=info&redirects&titles='
-categorymembers_params = 'action=query&list=categorymembers&cmnamespace=0&cmlimit=500&cmtitle=Category:'
+categorymembers_params = 'action=query&list=categorymembers&cmnamespace=0&cmlimit=500&cmtitle='
+cat_start_params = 'list=allpages&apnamespace=14&apfilterredir=nonredirects&aplimit=500&apprefix='
 
 def commify(amount):
     amount = str(amount)
@@ -78,6 +79,10 @@ def get_wiki_info(q):
         assert len(redirects) == 1
     return (ret['query']['pages'].values()[0], redirects[0]['to'] if redirects else None)
 
+def cat_start(q):
+    ret = web_get(cat_start_params + urlquote(q))
+    return [doc['title'] for doc in ret['query']['allpages'] if doc['title'] != q]
+
 def all_pages(q):
     ret = web_get(allpages_params + urlquote(q))
     return [doc['title'] for doc in ret['query']['allpages'] if doc['title'] != q]
@@ -93,7 +98,7 @@ def page_links(titles):
     return dict((doc['title'], set(l['title'] for l in doc['links'])) for doc in ret['query']['pages'].itervalues() if 'links' in doc)
 
 def is_disambig(doc):
-    return any('disambig' in t or t.endswith('dis') for t in (t['title'].lower() for t in doc.get('templates', [])))
+    return any('disambig' in t or t.endswith('dis') or t == 'template:surname' for t in (t['title'].lower() for t in doc.get('templates', [])))
 
 def test_is_disambig():
     assert not is_disambig({})
@@ -263,7 +268,9 @@ def findlink(q, title=None, message=None):
     this_title = q[0].upper() + q[1:]
     (totalhits, search) = wiki_search(q)
     (articles, redirects) = wiki_backlink(q)
-    cm = set(categorymembers(q))
+    cm = set()
+    for cat in set(['Category:' + this_title] + cat_start(q)):
+        cm.update(categorymembers(cat))
     norm_q = norm(q)
     norm_match_redirect = set(r for r in redirects if norm(r) == norm_q)
     longer_redirect = set(r for r in redirects if q.lower() in r.lower())
