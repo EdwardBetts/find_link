@@ -137,7 +137,7 @@ def wiki_redirects(q): # pages that link here
 def wiki_backlink(q):
     ret = web_get(backlink_params + urlquote(q))
     docs = ret['query']['backlinks']
-    if 'query-continue' in ret:
+    while 'query-continue' in ret:
         blcontinue = ret['query-continue']['backlinks']['blcontinue']
         ret = web_get(backlink_params + urlquote(q) + '&blcontinue=' + urlquote(blcontinue))
         docs += ret['query']['backlinks']
@@ -181,7 +181,7 @@ def test_find_link_in_content():
 class NoMatch(Exception):
     pass
 
-def find_link_in_content(q, content):
+def find_link_in_content(q, content, linkto=None):
     re_link = re.compile('([%s%s])%s' % (q[0].lower(), q[0].upper(), q[1:]))
     m = re_link.search(content)
     if m:
@@ -213,10 +213,12 @@ def find_link_in_content(q, content):
                 replacement = q.lower() if is_title_case(m.group(0)) else m.group(1) + q[1:]
     if not m:
         raise NoMatch
+    if linkto:
+        replacement = linkto + '|' + replacement
     content = re_link.sub(lambda m: "[[%s]]" % replacement, content, count=1)
     return (content, replacement)
 
-def get_page(title, q):
+def get_page(title, q, linkto=None):
     ret = web_get(content_params + urlquote(title))
     rev = ret['query']['pages'].values()[0]['revisions'][0]
     content = rev['*']
@@ -224,7 +226,7 @@ def get_page(title, q):
     timestamp = ''.join(c for c in timestamp if c.isdigit())
 
     try:
-        (content, replacement) = find_link_in_content(q, content)
+        (content, replacement) = find_link_in_content(q, content, linkto)
     except NoMatch:
         return None
 
@@ -256,15 +258,15 @@ def findlink(q, title=None, message=None):
     (info, redirect_to) = get_wiki_info(q)
     if 'missing' in info:
         return render_template('index.html', message=q + " isn't an article")
-    if redirect_to:
-        return redirect(url_for('findlink', q=redirect_to.replace(' ', '_')))
+    #if redirect_to:
+    #    return redirect(url_for('findlink', q=redirect_to.replace(' ', '_')))
     this_title = q[0].upper() + q[1:]
     (totalhits, search) = wiki_search(q)
     (articles, redirects) = wiki_backlink(q)
     cm = set(categorymembers(q))
     norm_q = norm(q)
     norm_match_redirect = set(r for r in redirects if norm(r) == norm_q)
-    longer_redirect = set(r for r in redirects if q.lower() in r.lower()
+    longer_redirect = set(r for r in redirects if q.lower() in r.lower())
 
     articles.add(this_title)
     for r in norm_match_redirect | longer_redirect:
@@ -304,9 +306,16 @@ def findlink(q, title=None, message=None):
                     doc['match'] = 'case_mismatch'
 
             doc['snippet'] = Markup(doc['snippet'])
-    return render_template('index.html', q=q, totalhits=totalhits, message=message, results=search, urlquote=urlquote,
-            commify=commify, longer_titles=longer, norm_match_redirect=norm_match_redirect,
-            case_flip_first=case_flip_first)
+    return render_template('index.html', q=q,
+        totalhits = totalhits,
+        message = message,
+        results = search,
+        urlquote = urlquote,
+        commify = commify,
+        longer_titles = longer,
+        redirect_to = redirect_to,
+        norm_match_redirect = norm_match_redirect,
+        case_flip_first = case_flip_first)
 
 @app.route("/favicon.ico")
 def favicon():
@@ -321,14 +330,19 @@ def newpages():
 def bad_url(q):
     return findlink(q)
 
+def wiki_space_norm(s):
+    return s.replace('_', ' ').strip()
+
 @app.route("/")
 def index():
     title = request.args.get('title')
     q = request.args.get('q')
+    linkto = request.args.get('linkto')
     if title and q:
-        q = q.replace('_', ' ').strip()
-        title = title.replace('_', ' ').strip()
-        reply = get_page(title, q)
+        q = wiki_space_norm(q)
+        title = wiki_space_norm(title)
+        linkto = wiki_space_norm(linkto)
+        reply = get_page(title, q, linkto)
         if reply is None:
             redirects = list(wiki_redirects(q))
             for r in redirects:

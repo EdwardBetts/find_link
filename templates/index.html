@@ -47,6 +47,9 @@ span.searchmatch { font-weight: bold; }
             <a href="{{ url_for('findlink', q=t.replace(' ', '_'))}}">{{t}}</a> (<a href="http://en.wikipedia.org/wiki/{{esc_title}}">view</a>){{ ',' if not loop.last }}
         {% endfor %}<p>
     {% endif %}
+    {% if redirect_to %}
+        <b>{{ q }}</b> is a redirect to <b>{{ redirect_to }}</b><p>
+    {% endif %}
     searching for {{ q }} {{ results | length }} found ({{totalhits}} total)<p>
     {% if q[0].isalpha() and results: %}
         {% set alt_case = case_flip_first(q) %}
@@ -59,7 +62,11 @@ span.searchmatch { font-weight: bold; }
     {% for doc in results %}
         {# <pre>{{ doc | pprint() }}</pre> #}
         {% set esc_title = urlquote(doc.title.replace(' ', '_')) %}
-        <a href="{{url_for('index')}}?q={{urlquote(q)}}&title={{urlquote(doc.title)}}" target="_blank">{{doc.title}}</a> ({{commify(doc.wordcount)}} words)
+        {% set params = 'q=' + urlquote(q) + '&title=' + urlquote(doc.title) %}
+        {% if redirect_to %}
+            {% set params = params + '&linkto=' + urlquote(redirect_to) %}
+        {% endif %}
+        <a href="{{url_for('index')}}?{{params}}" target="_blank">{{doc.title}}</a> ({{commify(doc.wordcount)}} words)
         {% if doc.match == 'exact' %}<span class="exact">exact match in snippet</span>{% endif %}
         {% if doc.match == 'case_mismatch' %}<span class="case_mismatch">case mismatch in snippet</span>{% endif %}
         {% if not doc.match %}<span class="nomatch">no match in snippet</span>{% endif %}
