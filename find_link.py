@@ -342,7 +342,8 @@ def index():
     if title and q:
         q = wiki_space_norm(q)
         title = wiki_space_norm(title)
-        linkto = wiki_space_norm(linkto)
+        if linkto:
+            linkto = wiki_space_norm(linkto)
         reply = get_page(title, q, linkto)
         if reply is None:
             redirects = list(wiki_redirects(q))
