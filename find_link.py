@@ -151,6 +151,17 @@ def wiki_backlink(q):
     redirects = set(doc['title'] for doc in docs if 'redirect' in doc)
     return (articles, redirects)
 
+def test_avoid_link_in_heading():
+    tp = 'test phrase'
+    content = '''
+=== Test phrase ===
+
+This sentence contains the test phrase.'''
+
+    (c, r) = find_link_in_content(tp, content)
+    assert c == content.replace(tp, '[[' + tp + ']]')
+    assert r == tp
+
 def test_find_link_in_content():
     import py.test
     with py.test.raises(NoMatch):
@@ -186,7 +197,77 @@ def test_find_link_in_content():
 class NoMatch(Exception):
     pass
 
+re_heading = re.compile(r'^\s*(=+)\s*(.+)\s*\1\s*$')
+def section_iter(text):
+    cur_section = ''
+    heading = None
+    for line in text.splitlines(True):
+        m = re_heading.match(line)
+        if not m:
+            cur_section += line
+            continue
+        if cur_section or heading:
+            yield (heading, cur_section)
+        heading = m.group()
+        cur_section = ''
+        continue
+    yield (heading, cur_section)
+
+def simple_match(m, q):
+    return m.group(1) + q[1:]
+
+def ignore_case_match(m, q):
+    if any(c.isupper() for c in q[1:]) or m.group(0) == m.group(0).upper():
+        return q
+    else:
+        return q.lower() if is_title_case(m.group(0)) else m.group(1) + q[1:]
+
+def extra_symbols_match(m, q):
+    if any(c.isupper() for c in q[1:]):
+        return q
+    else:
+        return q.lower() if is_title_case(m.group(0)) else m.group(1) + q[1:]
+
+def flexible_match(m, q):
+    if any(c.isupper() for c in q[1:]) or m.group(0) == m.group(0).upper():
+        return q
+    else:
+        return q.lower() if is_title_case(m.group(0)) else m.group(1) + q[1:]
+
+link_options = [
+    (simple_match, lambda q: re.compile('([%s%s])%s' % (q[0].lower(), q[0].upper(), q[1:]))),
+    # case-insensitive
+    (ignore_case_match, lambda q: re.compile('(%s)%s' % (q[0], q[1:]), re.I)),
+    (extra_symbols_match, lambda q: re.compile('(%s)%s' % (q[0], q[1:].replace(',', ',?').replace(' ', ' *[-\n]? *')), re.I)),
+    (flexible_match, lambda q: re.compile(r'(?:\[\[)?(%s)%s(?:\]\])?' % (q[0], ''.join('-?' + c for c in q[1:]).replace(' ', r"('?s?\]\])?'?s? ?(\[\[)?")), re.I)),
+]
+
 def find_link_in_content(q, content, linkto=None):
+    re_link = re.compile('([%s%s])%s' % (q[0].lower(), q[0].upper(), q[1:]))
+    sections = list(section_iter(content))
+    replacement = None
+    num = 0
+    for match_found, pattern in link_options:
+        if num == 2 and ' ' not in q:
+            continue
+        num += 1
+        re_link = pattern(q)
+        new_content = ''
+        for header, text in sections:
+            if not replacement:
+                m = re_link.search(text)
+                if m:
+                    replacement = match_found(m, q)
+                    assert replacement
+                    if linkto:
+                        replacement = linkto + '|' + replacement
+                    text = re_link.sub(lambda m: "[[%s]]" % replacement, text, count=1)
+            new_content += (header or '') + text
+        if replacement:
+            return (new_content, replacement)
+    raise NoMatch
+
+def find_link_in_content_old(q, content, linkto=None):
     re_link = re.compile('([%s%s])%s' % (q[0].lower(), q[0].upper(), q[1:]))
     m = re_link.search(content)
     if m:
