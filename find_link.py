@@ -436,7 +436,7 @@ def index():
         if reply is None:
             redirects = list(wiki_redirects(q))
             for r in redirects:
-                reply = get_page(title, r)
+                reply = get_page(title, r, linkto=q)
                 if reply:
                     return reply
             return findlink(q, title=title, message=q + ' not in ' + title)
