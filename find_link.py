@@ -260,49 +260,14 @@ def find_link_in_content(q, content, linkto=None):
                     replacement = match_found(m, q)
                     assert replacement
                     if linkto:
+                        if linkto[0].isupper() and replacement[0] == linkto[0].lower():
+                            linkto = linkto[0].lower() + linkto[1:]
                         replacement = linkto + '|' + replacement
                     text = re_link.sub(lambda m: "[[%s]]" % replacement, text, count=1)
             new_content += (header or '') + text
         if replacement:
             return (new_content, replacement)
     raise NoMatch
-
-def find_link_in_content_old(q, content, linkto=None):
-    re_link = re.compile('([%s%s])%s' % (q[0].lower(), q[0].upper(), q[1:]))
-    m = re_link.search(content)
-    if m:
-        replacement = m.group(1) + q[1:]
-    else:
-        re_link = re.compile('(%s)%s' % (q[0], q[1:]), re.I)
-        m = re_link.search(content)
-        if m:
-            if any(c.isupper() for c in q[1:]) or m.group(0) == m.group(0).upper():
-                replacement = q
-            else:
-                replacement = q.lower() if is_title_case(m.group(0)) else m.group(1) + q[1:]
-    if not m and ' ' in q:
-        re_link = re.compile('(%s)%s' % (q[0], q[1:].replace(',', ',?').replace(' ', ' *[-\n]? *')), re.I)
-        m = re_link.search(content)
-        if m:
-            if any(c.isupper() for c in q[1:]):
-                replacement = q
-            else:
-                replacement = q.lower() if is_title_case(m.group(0)) else m.group(1) + q[1:]
-    if not m:
-        pat = r'(?:\[\[)?(%s)%s(?:\]\])?' % (q[0], ''.join('-?' + c for c in q[1:]).replace(' ', r"('?s?\]\])?'?s? ?(\[\[)?"))
-        re_link = re.compile(pat, re.I)
-        m = re_link.search(content)
-        if m:
-            if any(c.isupper() for c in q[1:]) or m.group(0) == m.group(0).upper():
-                replacement = q
-            else:
-                replacement = q.lower() if is_title_case(m.group(0)) else m.group(1) + q[1:]
-    if not m:
-        raise NoMatch
-    if linkto:
-        replacement = linkto + '|' + replacement
-    content = re_link.sub(lambda m: "[[%s]]" % replacement, content, count=1)
-    return (content, replacement)
 
 def get_page(title, q, linkto=None):
     ret = web_get(content_params + urlquote(title))
