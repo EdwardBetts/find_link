@@ -194,6 +194,10 @@ def test_find_link_in_content():
         assert c == 'Able to find this [[test phrase]] in an article.'
         assert r == 'test phrase'
 
+    article = 'MyCar is exempt from the London Congestion Charge, road tax and parking charges.'
+    (c, r) = find_link_in_content('London congestion charge', article)
+    assert r == 'London congestion charge'
+
 class NoMatch(Exception):
     pass
 
@@ -216,23 +220,29 @@ def section_iter(text):
 def simple_match(m, q):
     return m.group(1) + q[1:]
 
+def find_case(m, q):
+    if is_title_case(m.group(0)):
+        x = get_case_from_content(q)
+        return x if x else q.lower()
+    return m.group(1) + q[1:]
+
 def ignore_case_match(m, q):
     if any(c.isupper() for c in q[1:]) or m.group(0) == m.group(0).upper():
         return q
     else:
-        return q.lower() if is_title_case(m.group(0)) else m.group(1) + q[1:]
+        return find_case(m, q)
 
 def extra_symbols_match(m, q):
     if any(c.isupper() for c in q[1:]):
         return q
     else:
-        return q.lower() if is_title_case(m.group(0)) else m.group(1) + q[1:]
+        return find_case(m, q)
 
 def flexible_match(m, q):
     if any(c.isupper() for c in q[1:]) or m.group(0) == m.group(0).upper():
         return q
     else:
-        return q.lower() if is_title_case(m.group(0)) else m.group(1) + q[1:]
+        return find_case(m, q)
 
 link_options = [
     (simple_match, lambda q: re.compile('([%s%s])%s' % (q[0].lower(), q[0].upper(), q[1:]))),
@@ -268,6 +278,18 @@ def find_link_in_content(q, content, linkto=None):
         if replacement:
             return (new_content, replacement)
     raise NoMatch
+
+def test_get_case_from_content():
+    title = 'London congestion charge'
+    assert get_case_from_content(title) == title
+
+def get_case_from_content(title):
+    ret = web_get(content_params + urlquote(title))
+    rev = ret['query']['pages'].values()[0]['revisions'][0]
+    content = rev['*']
+    start = content.lower().find("'''" + title.replace('_', ' ').lower() + "'''")
+    if start != -1:
+        return content[start+3:start+3+len(title)]
 
 def get_page(title, q, linkto=None):
     ret = web_get(content_params + urlquote(title))
