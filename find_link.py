@@ -333,6 +333,11 @@ def findlink(q, title=None, message=None):
         return render_template('index.html', message=q + " isn't an article")
     #if redirect_to:
     #    return redirect(url_for('findlink', q=redirect_to.replace(' ', '_')))
+    if redirect_to:
+        if q[0].isupper():
+            redirect_to = redirect_to[0].upper() +  redirect_to[1:]
+        elif q[0].islower():
+            redirect_to = redirect_to[0].lower() +  redirect_to[1:]
     this_title = q[0].upper() + q[1:]
     (totalhits, search) = wiki_search(q)
     (articles, redirects) = wiki_backlink(q)
