@@ -151,6 +151,13 @@ def wiki_backlink(q):
     redirects = set(doc['title'] for doc in docs if 'redirect' in doc)
     return (articles, redirects)
 
+def test_en_dash():
+    title = u'obsessive\u2013compulsive disorder'
+    content = 'This is a obsessive-compulsive disorder test'
+    (c, r) = find_link_in_content(title, content)
+    assert r == title
+    assert c == u'This is a [[obsessive\u2013compulsive disorder]] test'
+
 def test_avoid_link_in_heading():
     tp = 'test phrase'
     content = '''
@@ -244,11 +251,15 @@ def flexible_match(m, q):
     else:
         return find_case(m, q)
 
+en_dash = u'\u2013'
+trans = { ',': ',?', ' ': ' *[-\n]? *' }
+trans[en_dash] = trans[' ']
+
 link_options = [
     (simple_match, lambda q: re.compile('([%s%s])%s' % (q[0].lower(), q[0].upper(), q[1:]))),
     # case-insensitive
     (ignore_case_match, lambda q: re.compile('(%s)%s' % (q[0], q[1:]), re.I)),
-    (extra_symbols_match, lambda q: re.compile('(%s)%s' % (q[0], q[1:].replace(',', ',?').replace(' ', ' *[-\n]? *')), re.I)),
+    (extra_symbols_match, lambda q: re.compile('(%s)%s' % (q[0], ''.join(trans.get(c, c) for c in q[1:])), re.I)),
     (flexible_match, lambda q: re.compile(r'(?:\[\[)?(%s)%s(?:\]\])?' % (q[0], ''.join('-?' + c for c in q[1:]).replace(' ', r"('?s?\]\])?'?s? ?(\[\[)?")), re.I)),
 ]
 
