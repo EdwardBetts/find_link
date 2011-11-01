@@ -332,16 +332,43 @@ def get_page(title, q, linkto=None):
             content=content,
             title=title, summary=summary, timestamp=timestamp)
 
+def case_flip(s):
+    if s.islower():
+        return s.upper()
+    if s.isupper():
+        return s.lower()
+    return s
+def case_flip_first(s):
+    return case_flip(s[0]) + s[1:]
+
+def match_type(q, snippet):
+    q = q.replace('\u2013', '-')
+    snippet = snippet.replace('\u2013', '-')
+    if q in snippet or case_flip_first(q) in snippet:
+        return 'exact'
+    match = None
+    if q.lower() in snippet.lower():
+        match = 'case_mismatch'
+    if match != 'exact' and q.endswith('y'):
+        if q[:-1] in snippet or case_flip_first(q[:-1]) in snippet:
+            return 'exact'
+    elif match is None:
+        if q[:-1].lower() in snippet.lower():
+            match = 'case_mismatch'
+    return match
+ 
+def test_match_type():
+    assert match_type('foo', 'foo') == 'exact'
+    assert match_type('foo', 'bar') == None
+    assert match_type('bar', 'foo bar baz') == 'exact'
+    assert match_type('clean coal technology', 'foo clean coal technologies baz') == 'exact'
+    assert match_type('bar', 'foo Bar baz') == 'exact'
+    assert match_type('bar', 'foo BAR baz') == 'case_mismatch'
+    assert match_type('foo-bar', 'aa foo-bar cc') == 'exact'
+    assert match_type('foo\u2013bar', 'aa foo-bar cc') == 'exact'
+
 @app.route("/<q>")
 def findlink(q, title=None, message=None):
-    def case_flip(s):
-        if s.islower():
-            return s.upper()
-        if s.isupper():
-            return s.lower()
-        return s
-    def case_flip_first(s):
-        return case_flip(s[0]) + s[1:]
 
     q_trim = q.strip('_')
     if ' ' in q or q != q_trim:
@@ -392,19 +419,7 @@ def findlink(q, title=None, message=None):
     # and (doc['title'] not in links or this_title not in links[doc['title']])]
         for doc in search:
             without_markup = doc['snippet'].replace("<span class='searchmatch'>", "").replace("</span>", "").replace('  ', ' ')
-            #doc['without_markup'] = without_markup
-            doc['match'] = None
-            if q in without_markup or case_flip_first(q) in without_markup:
-                doc['match'] = 'exact'
-            elif q.lower() in without_markup.lower():
-                doc['match'] = 'case_mismatch'
-            if doc['match'] != 'exact' and q.endswith('y'):
-                if q[:-1] in without_markup or case_flip_first(q[:-1]) in without_markup:
-                    doc['match'] = 'exact'
-            elif doc['match'] is None:
-                if q[:-1].lower() in without_markup.lower():
-                    doc['match'] = 'case_mismatch'
-
+            doc['match'] = match_type(q, snippet)
             doc['snippet'] = Markup(doc['snippet'])
     return render_template('index.html', q=q,
         totalhits = totalhits,
