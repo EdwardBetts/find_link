@@ -386,7 +386,7 @@ def findlink(q, title=None, message=None):
             redirect_to = redirect_to[0].lower() +  redirect_to[1:]
     this_title = q[0].upper() + q[1:]
     (totalhits, search) = wiki_search(q)
-    (articles, redirects) = wiki_backlink(q)
+    (articles, redirects) = wiki_backlink(redirect_to)
     cm = set()
     for cat in set(['Category:' + this_title] + cat_start(q)):
         cm.update(categorymembers(cat))
@@ -395,6 +395,7 @@ def findlink(q, title=None, message=None):
     longer_redirect = set(r for r in redirects if q.lower() in r.lower())
 
     articles.add(this_title)
+    articles.add(redirect_to[0].upper() + redirect_to[1:])
     for r in norm_match_redirect | longer_redirect:
         articles.add(r)
         a2, r2 = wiki_backlink(r)
@@ -405,7 +406,7 @@ def findlink(q, title=None, message=None):
     lq = q.lower()
     for doc in search:
         lt = doc['title'].lower()
-        if lq != lt and lq in lt:
+        if lt != lt and lq in lt:
             articles.add(doc['title'])
             (more_articles, more_redirects) = wiki_backlink(doc['title'])
             articles.update(more_articles)
