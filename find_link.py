@@ -342,8 +342,8 @@ def case_flip_first(s):
     return case_flip(s[0]) + s[1:]
 
 def match_type(q, snippet):
-    q = q.replace('\u2013', '-')
-    snippet = snippet.replace('\u2013', '-')
+    q = q.replace(u'\u2013', '-')
+    snippet = snippet.replace(u'\u2013', '-')
     if q in snippet or case_flip_first(q) in snippet:
         return 'exact'
     match = None
@@ -419,7 +419,7 @@ def findlink(q, title=None, message=None):
     # and (doc['title'] not in links or this_title not in links[doc['title']])]
         for doc in search:
             without_markup = doc['snippet'].replace("<span class='searchmatch'>", "").replace("</span>", "").replace('  ', ' ')
-            doc['match'] = match_type(q, snippet)
+            doc['match'] = match_type(q, without_markup)
             doc['snippet'] = Markup(doc['snippet'])
     return render_template('index.html', q=q,
         totalhits = totalhits,
