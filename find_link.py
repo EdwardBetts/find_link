@@ -342,8 +342,8 @@ def case_flip_first(s):
     return case_flip(s[0]) + s[1:]
 
 def match_type(q, snippet):
-    q = q.replace('\u2013', '-')
-    snippet = snippet.replace('\u2013', '-')
+    q = q.replace(u'\u2013', '-')
+    snippet = snippet.replace(u'\u2013', '-')
     if q in snippet or case_flip_first(q) in snippet:
         return 'exact'
     match = None
@@ -386,7 +386,7 @@ def findlink(q, title=None, message=None):
             redirect_to = redirect_to[0].lower() +  redirect_to[1:]
     this_title = q[0].upper() + q[1:]
     (totalhits, search) = wiki_search(q)
-    (articles, redirects) = wiki_backlink(q)
+    (articles, redirects) = wiki_backlink(redirect_to)
     cm = set()
     for cat in set(['Category:' + this_title] + cat_start(q)):
         cm.update(categorymembers(cat))
@@ -395,6 +395,7 @@ def findlink(q, title=None, message=None):
     longer_redirect = set(r for r in redirects if q.lower() in r.lower())
 
     articles.add(this_title)
+    articles.add(redirect_to[0].upper() + redirect_to[1:])
     for r in norm_match_redirect | longer_redirect:
         articles.add(r)
         a2, r2 = wiki_backlink(r)
@@ -405,7 +406,7 @@ def findlink(q, title=None, message=None):
     lq = q.lower()
     for doc in search:
         lt = doc['title'].lower()
-        if lq != lt and lq in lt:
+        if lt != lt and lq in lt:
             articles.add(doc['title'])
             (more_articles, more_redirects) = wiki_backlink(doc['title'])
             articles.update(more_articles)
@@ -419,7 +420,7 @@ def findlink(q, title=None, message=None):
     # and (doc['title'] not in links or this_title not in links[doc['title']])]
         for doc in search:
             without_markup = doc['snippet'].replace("<span class='searchmatch'>", "").replace("</span>", "").replace('  ', ' ')
-            doc['match'] = match_type(q, snippet)
+            doc['match'] = match_type(q, without_markup)
             doc['snippet'] = Markup(doc['snippet'])
     return render_template('index.html', q=q,
         totalhits = totalhits,
