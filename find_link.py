@@ -371,7 +371,7 @@ def test_match_type():
 def findlink(q, title=None, message=None):
 
     q_trim = q.strip('_')
-    if ' ' in q or q != q_trim:
+    if not message and (' ' in q or q != q_trim):
         return redirect(url_for('findlink', q=q.replace(' ', '_').strip('_'), message=message))
     q = q.replace('_', ' ').strip()
     (info, redirect_to) = get_wiki_info(q)
@@ -386,7 +386,7 @@ def findlink(q, title=None, message=None):
             redirect_to = redirect_to[0].lower() +  redirect_to[1:]
     this_title = q[0].upper() + q[1:]
     (totalhits, search) = wiki_search(q)
-    (articles, redirects) = wiki_backlink(redirect_to)
+    (articles, redirects) = wiki_backlink(redirect_to or q)
     cm = set()
     for cat in set(['Category:' + this_title] + cat_start(q)):
         cm.update(categorymembers(cat))
@@ -395,7 +395,8 @@ def findlink(q, title=None, message=None):
     longer_redirect = set(r for r in redirects if q.lower() in r.lower())
 
     articles.add(this_title)
-    articles.add(redirect_to[0].upper() + redirect_to[1:])
+    if redirect_to:
+        articles.add(redirect_to[0].upper() + redirect_to[1:])
     for r in norm_match_redirect | longer_redirect:
         articles.add(r)
         a2, r2 = wiki_backlink(r)
@@ -466,7 +467,7 @@ def index():
                 reply = get_page(title, r, linkto=q)
                 if reply:
                     return reply
-            return findlink(q, title=title, message=q + ' not in ' + title)
+            return findlink(q.replace(' ', '_'), title=title, message=q + ' not in ' + title)
         else:
             return reply
     if q:
