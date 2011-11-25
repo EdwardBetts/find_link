@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, Markup, redirect, url_for
-import urllib, json, re, os
+from time import time
 from datetime import datetime
+import urllib, json, re, os
 
 app = Flask(__name__)
 last_slash = __file__.rfind('/')
@@ -22,12 +23,19 @@ info_params = 'action=query&prop=info&redirects&titles='
 categorymembers_params = 'action=query&list=categorymembers&cmnamespace=0&cmlimit=500&cmtitle='
 cat_start_params = 'list=allpages&apnamespace=14&apfilterredir=nonredirects&aplimit=500&apprefix='
 
+save_to_cache = False
+
 def commify(amount):
     amount = str(amount)
     firstcomma = len(amount)%3 or 3  # set to 3 if would make a leading comma
     first, rest = amount[:firstcomma], amount[firstcomma:]
     segments = [first] + [rest[i:i+3] for i in range(0, len(rest), 3)]
     return ",".join(segments)
+
+def test_commify():
+    assert commify(1) == '1'
+    assert commify(2222) == '2,222'
+    assert commify('3333') == '3,333'
 
 re_space_or_dash = re.compile('[ -]')
 
@@ -50,13 +58,19 @@ urllib._urlopener = AppURLopener()
 def urlquote(s):
     return urllib.quote_plus(s.encode('utf-8'))
 
-def test_is_title_case():
+def test_urlquote():
     assert urlquote('test') == 'test'
     assert urlquote('test test') == 'test+test'
     assert urlquote(u'na\xefve') == 'na%C3%AFve'
 
 def web_get(params):
-    return json.load(urllib.urlopen(query_url + params))
+    data = urllib.urlopen(query_url + params).read()
+    if save_to_cache:
+        out = open('cache/' + str(time()), 'w')
+        print >> out, params
+        print >> out, data
+        out.close()
+    return json.loads(data)
 
 def wiki_search(q):
     search_url = search_params + urlquote('"%s"' % q)
@@ -71,25 +85,77 @@ def wiki_search(q):
         results += ret['query']['search']
     return (totalhits, results)
 
+class Missing (Exception):
+    pass
+
 def get_wiki_info(q):
     ret = web_get(info_params + urlquote(q))
     redirects = []
     if ret['query'].get('redirects'):
         redirects = ret['query']['redirects']
         assert len(redirects) == 1
-    return (ret['query']['pages'].values()[0], redirects[0]['to'] if redirects else None)
+    if 'missing' in ret['query']['pages'].values()[0]:
+        raise Missing
+    return redirects[0]['to'] if redirects else None
+
+def test_get_wiki_info():
+    global web_get
+    web_get = lambda(param): {
+        "query":{
+            "normalized":[{
+                "from":"government budget deficit",
+                "to":"Government budget deficit"
+            }],
+            "pages":{
+                "312605":{
+                    "pageid":312605,"ns":0,"title":"Government budget deficit","touched":"2011-11-24T22:06:21Z","lastrevid":462258859,"counter":"","length":14071
+                }
+            }
+        }
+    }
+
+    redirects = get_wiki_info('government budget deficit')
+    assert redirects == None
+
+    web_get = lambda(param): {
+        "query":{
+            "normalized":[{"from":"government budget deficits","to":"Government budget deficits"}],
+            "pages":{"-1":{"ns":0,"title":"Government budget deficits","missing":""}}
+        }
+    }
+    is_missing = False
+    try:
+        redirects = get_wiki_info('government budget deficits')
+    except Missing:
+        is_missing = True
+    assert is_missing
 
 def cat_start(q):
     ret = web_get(cat_start_params + urlquote(q))
     return [doc['title'] for doc in ret['query']['allpages'] if doc['title'] != q]
 
+def test_cat_start():
+    global web_get
+    web_get = lambda params: {"query":{"allpages":[]}}
+    assert cat_start('test123') == []
+
 def all_pages(q):
     ret = web_get(allpages_params + urlquote(q))
     return [doc['title'] for doc in ret['query']['allpages'] if doc['title'] != q]
 
+def test_all_pages():
+    global web_get
+    web_get = lambda params: {"query":{"allpages":[{"pageid":312605,"ns":0,"title":"Government budget deficit"}]}}
+    assert all_pages('Government budget deficit') == []
+
 def categorymembers(q):
     ret = web_get(categorymembers_params + urlquote(q[0].upper()) + urlquote(q[1:]))
     return [doc['title'] for doc in ret['query']['categorymembers'] if doc['title'] != q]
+
+def test_categorymembers():
+    global web_get
+    web_get = lambda params: {"query":{"categorymembers":[]}}
+    assert categorymembers('test123') == []
 
 def page_links(titles):
     titles = list(titles)
@@ -175,6 +241,7 @@ This sentence contains the test phrase.'''
     assert r == tp
 
 def test_find_link_in_content():
+    get_case_from_content = lambda s: None
     import py.test
     with py.test.raises(NoMatch):
         find_link_in_content('foo', 'bar')
@@ -206,6 +273,14 @@ def test_find_link_in_content():
         assert c == 'Able to find this [[test phrase]] in an article.'
         assert r == 'test phrase'
 
+    global web_get
+    title = 'London congestion charge'
+    web_get = lambda params: {
+        'query': { 'pages': { 1: { 'revisions': [{
+            '*': "'''" + title + "'''"
+            }]}}
+    }}
+
     article = 'MyCar is exempt from the London Congestion Charge, road tax and parking charges.'
     (c, r) = find_link_in_content('London congestion charge', article)
     assert r == 'London congestion charge'
@@ -229,32 +304,16 @@ def section_iter(text):
         continue
     yield (heading, cur_section)
 
-def simple_match(m, q):
-    return m.group(1) + q[1:]
-
-def find_case(m, q):
-    if is_title_case(m.group(0)):
-        x = get_case_from_content(q)
-        return x if x else q.lower()
-    return m.group(1) + q[1:]
-
-def ignore_case_match(m, q):
-    if any(c.isupper() for c in q[1:]) or m.group(0) == m.group(0).upper():
-        return q
-    else:
-        return find_case(m, q)
-
-def extra_symbols_match(m, q):
-    if any(c.isupper() for c in q[1:]):
-        return q
-    else:
-        return find_case(m, q)
-
-def flexible_match(m, q):
-    if any(c.isupper() for c in q[1:]) or m.group(0) == m.group(0).upper():
-        return q
-    else:
-        return find_case(m, q)
+def test_section_iter():
+    assert list(section_iter('test')) == [(None, 'test')]
+    text = '''==Heading==
+Paragraph'''
+    text = '''==Heading 1 ==
+Paragraph 1.
+==Heading 2 ==
+Paragraph 2.
+'''
+    assert list(section_iter(text)) == [('==Heading 1 ==\n', 'Paragraph 1.\n'), ('==Heading 2 ==\n', 'Paragraph 2.\n')]
 
 en_dash = u'\u2013'
 trans = { ',': ',?', ' ': ' *[-\n]? *' }
@@ -263,43 +322,61 @@ trans[en_dash] = trans[' ']
 trans2 = { ' ': r"('?s?\]\])?'?s? ?(\[\[)?" }
 trans2[en_dash] = trans2[' ']
 
-link_options = [
-    (simple_match, lambda q: re.compile('([%s%s])%s' % (q[0].lower(), q[0].upper(), q[1:]))),
-    # case-insensitive
-    (ignore_case_match, lambda q: re.compile('(%s)%s' % (q[0], q[1:]), re.I)),
-    (extra_symbols_match, lambda q: re.compile('(%s)%s' % (q[0], ''.join(trans.get(c, c) for c in q[1:])), re.I)),
-    (flexible_match, lambda q: re.compile(r'(?:\[\[)?(%s)%s(?:\]\])?' % (q[0], ''.join('-?' + trans2.get(c, c) for c in q[1:])), re.I)),
+patterns = [
+    lambda q: re.compile('(%s)%s' % (q[0], q[1:]), re.I),
+    lambda q: re.compile('(%s)%s' % (q[0], ''.join(trans.get(c, c) for c in q[1:])), re.I),
+    lambda q: re.compile(r'(?:\[\[)?(%s)%s(?:\]\])?' % (q[0], ''.join('-?' + trans2.get(c, c) for c in q[1:])), re.I),
 ]
+
+def test_patterns():
+    q = 'San Francisco'
+    assert patterns[0](q).pattern == '(S)' + q[1:]
+    assert patterns[1](q).pattern == '(S)an *[-\n]? *' + q[4:]
+
+def match_found(m, q, linkto):
+    if q[1:] == m.group(0)[1:]:
+        replacement = m.group(1) + q[1:]
+    elif any(c.isupper() for c in q[1:]) or m.group(0) == m.group(0).upper():
+        replacement = q
+    elif is_title_case(m.group(0)):
+        replacement = get_case_from_content(q)
+        if replacement is None:
+            replacement = q.lower()
+    else:
+        replacement = m.group(1) + q[1:]
+    assert replacement
+    if linkto:
+        if linkto[0].isupper() and replacement[0] == linkto[0].lower():
+            linkto = linkto[0].lower() + linkto[1:]
+        replacement = linkto + '|' + replacement
+    return replacement
 
 def find_link_in_content(q, content, linkto=None):
     re_link = re.compile('([%s%s])%s' % (q[0].lower(), q[0].upper(), q[1:]))
     sections = list(section_iter(content))
     replacement = None
-    num = 0
-    for match_found, pattern in link_options:
-        if num == 2 and ' ' not in q:
-            continue
-        num += 1
+    for pattern in patterns:
         re_link = pattern(q)
         new_content = ''
         for header, text in sections:
             if not replacement:
                 m = re_link.search(text)
                 if m:
-                    replacement = match_found(m, q)
-                    assert replacement
-                    if linkto:
-                        if linkto[0].isupper() and replacement[0] == linkto[0].lower():
-                            linkto = linkto[0].lower() + linkto[1:]
-                        replacement = linkto + '|' + replacement
+                    replacement = match_found(m, q, linkto)
                     text = re_link.sub(lambda m: "[[%s]]" % replacement, text, count=1)
             new_content += (header or '') + text
         if replacement:
             return (new_content, replacement)
     raise NoMatch
 
-def test_get_case_from_content():
+def test_get_case_from_content(): # test is broken
+    global web_get
     title = 'London congestion charge'
+    web_get = lambda params: {
+        'query': { 'pages': { 1: { 'revisions': [{
+            '*': "'''" + title + "'''"
+            }]}}
+    }}
     assert get_case_from_content(title) == title
 
 def get_case_from_content(title):
@@ -309,6 +386,11 @@ def get_case_from_content(title):
     start = content.lower().find("'''" + title.replace('_', ' ').lower() + "'''")
     if start != -1:
         return content[start+3:start+3+len(title)]
+
+@app.route('/diff/<q>')
+def diff_view(q):
+    title = request.args.get('title')
+    return render_template('diff.html', q=q, title=title)
 
 def get_page(title, q, linkto=None):
     ret = web_get(content_params + urlquote(title))
@@ -365,7 +447,7 @@ def test_match_type():
     assert match_type('bar', 'foo Bar baz') == 'exact'
     assert match_type('bar', 'foo BAR baz') == 'case_mismatch'
     assert match_type('foo-bar', 'aa foo-bar cc') == 'exact'
-    assert match_type('foo\u2013bar', 'aa foo-bar cc') == 'exact'
+    assert match_type(u'foo\u2013bar', 'aa foo-bar cc') == 'exact'
 
 @app.route("/<q>")
 def findlink(q, title=None, message=None):
@@ -374,8 +456,9 @@ def findlink(q, title=None, message=None):
     if not message and (' ' in q or q != q_trim):
         return redirect(url_for('findlink', q=q.replace(' ', '_').strip('_'), message=message))
     q = q.replace('_', ' ').strip()
-    (info, redirect_to) = get_wiki_info(q)
-    if 'missing' in info:
+    try:
+        redirect_to = get_wiki_info(q)
+    except Missing:
         return render_template('index.html', message=q + " isn't an article")
     #if redirect_to:
     #    return redirect(url_for('findlink', q=redirect_to.replace(' ', '_')))
