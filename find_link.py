@@ -1,3 +1,4 @@
+# coding=utf-8
 from flask import Flask, render_template, request, Markup, redirect, url_for
 from time import time
 from datetime import datetime
@@ -240,7 +241,7 @@ This sentence contains the test phrase.'''
     assert c == content.replace(tp, '[[' + tp + ']]')
     assert r == tp
 
-re_cite = re.compile('{{cite.*}}', re.I | re.S)
+re_cite = re.compile('<ref>\s*{{cite.*}}\s*</ref>', re.I | re.S)
 def parse_cite(text):
     prev = 0
     for m in re_cite.finditer(text):
@@ -251,7 +252,7 @@ def parse_cite(text):
 
 def test_avoid_link_in_cite():
     tp = 'magic'
-    content = 'test {{cite web|title=Magic|url=http://magic.com}}'
+    content = 'test <ref>{{cite web|title=Magic|url=http://magic.com}}</ref>'
     (c, r) = find_link_in_content(tp, content + ' ' + tp)
     assert c == content + ' [[' + tp + ']]' 
     assert r == tp
@@ -259,6 +260,12 @@ def test_avoid_link_in_cite():
     import py.test
     with py.test.raises(NoMatch):
         find_link_in_content(tp, content)
+
+    tp = 'abc'
+    content = '==Early life==\n<ref>{{cite news|}}</ref>abc'
+    (c, r) = find_link_in_content(tp, content)
+    assert c == content.replace(tp, '[[' + tp + ']]')
+    assert r == tp
 
 def test_find_link_in_content():
     get_case_from_content = lambda s: None
@@ -379,13 +386,15 @@ def find_link_in_content(q, content, linkto=None):
         re_link = pattern(q)
         new_content = ''
         for header, section_text in sections:
+            if header:
+                new_content += header 
             for token_type, text in parse_cite(section_text):
                 if token_type == 'text' and not replacement:
                     m = re_link.search(text)
                     if m:
                         replacement = match_found(m, q, linkto)
                         text = re_link.sub(lambda m: "[[%s]]" % replacement, text, count=1)
-                new_content += (header or '') + text
+                new_content += text
         if replacement:
             return (new_content, replacement)
     raise NoMatch
