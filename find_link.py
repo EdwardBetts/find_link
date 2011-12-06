@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, Markup, redirect, url_for
 from time import time
 from datetime import datetime
-import urllib, json, re, os
+import urllib, json, re, os, sys
 
 app = Flask(__name__)
 last_slash = __file__.rfind('/')
@@ -240,6 +240,26 @@ This sentence contains the test phrase.'''
     assert c == content.replace(tp, '[[' + tp + ']]')
     assert r == tp
 
+re_cite = re.compile('{{cite.*}}', re.I | re.S)
+def parse_cite(text):
+    prev = 0
+    for m in re_cite.finditer(text):
+        yield ('text', text[prev:m.start()])
+        yield ('cite', m.group(0))
+        prev = m.end()
+    yield ('text', text[prev:])
+
+def test_avoid_link_in_cite():
+    tp = 'magic'
+    content = 'test {{cite web|title=Magic|url=http://magic.com}}'
+    (c, r) = find_link_in_content(tp, content + ' ' + tp)
+    assert c == content + ' [[' + tp + ']]' 
+    assert r == tp
+
+    import py.test
+    with py.test.raises(NoMatch):
+        find_link_in_content(tp, content)
+
 def test_find_link_in_content():
     get_case_from_content = lambda s: None
     import py.test
@@ -358,13 +378,14 @@ def find_link_in_content(q, content, linkto=None):
     for pattern in patterns:
         re_link = pattern(q)
         new_content = ''
-        for header, text in sections:
-            if not replacement:
-                m = re_link.search(text)
-                if m:
-                    replacement = match_found(m, q, linkto)
-                    text = re_link.sub(lambda m: "[[%s]]" % replacement, text, count=1)
-            new_content += (header or '') + text
+        for header, section_text in sections:
+            for token_type, text in parse_cite(section_text):
+                if token_type == 'text' and not replacement:
+                    m = re_link.search(text)
+                    if m:
+                        replacement = match_found(m, q, linkto)
+                        text = re_link.sub(lambda m: "[[%s]]" % replacement, text, count=1)
+                new_content += (header or '') + text
         if replacement:
             return (new_content, replacement)
     raise NoMatch
