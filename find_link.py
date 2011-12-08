@@ -286,6 +286,11 @@ def test_find_link_in_content():
     assert c == otrain.replace('turnstile', '[[turnstile]]')
     assert r == 'turnstile'
 
+    station = 'Ticket barriers control access to all platforms, although the bridge entrance has no barriers.'
+    (c, r) = find_link_in_content('ticket barriers', station, linkto='turnstile')
+    assert c == station.replace('Ticket barriers', '[[Turnstile|Ticket barriers]]')
+    assert r == 'Turnstile|Ticket barriers'
+
     content = [
         'Able to find this test phrase in an article.',
         'Able to find this test  phrase in an article.',
@@ -366,11 +371,13 @@ def test_patterns():
     assert patterns[1](q).pattern == '(S)an *[-\n]? *' + q[4:]
 
 def match_found(m, q, linkto):
+    print (q[1:], m.group(0)[1:])
     if q[1:] == m.group(0)[1:]:
         replacement = m.group(1) + q[1:]
     elif any(c.isupper() for c in q[1:]) or m.group(0) == m.group(0).upper():
         replacement = q
     elif is_title_case(m.group(0)):
+        print is_title_case(m.group(0))
         replacement = get_case_from_content(q)
         if replacement is None:
             replacement = q.lower()
@@ -380,6 +387,8 @@ def match_found(m, q, linkto):
     if linkto:
         if linkto[0].isupper() and replacement[0] == linkto[0].lower():
             linkto = linkto[0].lower() + linkto[1:]
+        elif replacement[0].isupper():
+            linkto = linkto[0].upper() + linkto[1:]
         replacement = linkto + '|' + replacement
     return replacement
 
@@ -403,6 +412,7 @@ def find_link_in_content(q, content, linkto=None):
                     m = re_link.search(text)
                     if m:
                         replacement = match_found(m, q, linkto)
+                        print m.group(0), replacement
                         text = re_link.sub(lambda m: "[[%s]]" % replacement, text, count=1)
                 new_content += text
         if replacement:
