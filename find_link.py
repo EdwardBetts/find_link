@@ -281,6 +281,11 @@ def test_find_link_in_content():
         input_content = 'Able to find this test  \n  \n  phrase in an article.'
         find_link_in_content('test phrase', input_content)
 
+    otrain = 'Ticketing on the O-Train works entirely on a proof-of-payment basis; there are no ticket barriers or turnstiles, and the driver does not check fares.'
+    (c, r) = find_link_in_content('ticket barriers', otrain, linkto='turnstile')
+    assert c == otrain.replace('turnstile', '[[turnstile]]')
+    assert r == 'turnstile'
+
     content = [
         'Able to find this test phrase in an article.',
         'Able to find this test  phrase in an article.',
@@ -379,6 +384,11 @@ def match_found(m, q, linkto):
     return replacement
 
 def find_link_in_content(q, content, linkto=None):
+    if linkto:
+        try:
+            return find_link_in_content(linkto, content)
+        except NoMatch:
+            pass
     re_link = re.compile('([%s%s])%s' % (q[0].lower(), q[0].upper(), q[1:]))
     sections = list(section_iter(content))
     replacement = None
