@@ -73,7 +73,11 @@ def web_get(params):
         out.close()
     return json.loads(data)
 
+re_end_parens = re.compile(r' \(.*\)$')
 def wiki_search(q):
+    m = re_end_parens.search(q)
+    if m:
+        q = q[:m.start()]
     search_url = search_params + urlquote('"%s"' % q)
     ret = web_get(search_url)
     totalhits = ret['query']['searchinfo']['totalhits']
@@ -165,7 +169,7 @@ def page_links(titles):
     return dict((doc['title'], set(l['title'] for l in doc['links'])) for doc in ret['query']['pages'].itervalues() if 'links' in doc)
 
 def is_disambig(doc):
-    return any('disambig' in t or t.endswith('dis') or t == 'template:surname' for t in (t['title'].lower() for t in doc.get('templates', [])))
+    return any('disambig' in t or t.endswith('dis') or 'given name' in t or t == 'template:surname' for t in (t['title'].lower() for t in doc.get('templates', [])))
 
 def test_is_disambig():
     assert not is_disambig({})
@@ -241,7 +245,7 @@ This sentence contains the test phrase.'''
     assert c == content.replace(tp, '[[' + tp + ']]')
     assert r == tp
 
-re_cite = re.compile('<ref>\s*{{cite.*}}\s*</ref>', re.I | re.S)
+re_cite = re.compile('<ref>\s*{{cite.*?}}\s*</ref>', re.I | re.S)
 def parse_cite(text):
     prev = 0
     for m in re_cite.finditer(text):
@@ -303,6 +307,7 @@ def test_find_link_in_content():
         'Able to find this test\nPhrase in an article.', 
         'Able to find this [[test]] phrase in an article.',
         'Able to find this TEST [[PHRASE]] in an article.', 
+        'Able to find this [[testing|test]] phrase in an article.',
         'Able to find this testphrase in an article.']
 
     for input_content in content:
@@ -362,7 +367,7 @@ trans2[en_dash] = trans2[' ']
 patterns = [
     lambda q: re.compile('(%s)%s' % (q[0], q[1:]), re.I),
     lambda q: re.compile('(%s)%s' % (q[0], ''.join(trans.get(c, c) for c in q[1:])), re.I),
-    lambda q: re.compile(r'(?:\[\[)?(%s)%s(?:\]\])?' % (q[0], ''.join('-?' + trans2.get(c, c) for c in q[1:])), re.I),
+    lambda q: re.compile(r'(?:\[\[(?:[^]]+\|)?)?(%s)%s(?:\]\])?' % (q[0], ''.join('-?' + trans2.get(c, c) for c in q[1:])), re.I),
 ]
 
 def test_patterns():
@@ -371,13 +376,11 @@ def test_patterns():
     assert patterns[1](q).pattern == '(S)an *[-\n]? *' + q[4:]
 
 def match_found(m, q, linkto):
-    print (q[1:], m.group(0)[1:])
     if q[1:] == m.group(0)[1:]:
         replacement = m.group(1) + q[1:]
     elif any(c.isupper() for c in q[1:]) or m.group(0) == m.group(0).upper():
         replacement = q
     elif is_title_case(m.group(0)):
-        print is_title_case(m.group(0))
         replacement = get_case_from_content(q)
         if replacement is None:
             replacement = q.lower()
@@ -412,7 +415,6 @@ def find_link_in_content(q, content, linkto=None):
                     m = re_link.search(text)
                     if m:
                         replacement = match_found(m, q, linkto)
-                        print m.group(0), replacement
                         text = re_link.sub(lambda m: "[[%s]]" % replacement, text, count=1)
                 new_content += text
         if replacement:
@@ -499,7 +501,7 @@ def test_match_type():
     assert match_type('foo-bar', 'aa foo-bar cc') == 'exact'
     assert match_type(u'foo\u2013bar', 'aa foo-bar cc') == 'exact'
 
-@app.route("/<q>")
+@app.route("/<path:q>")
 def findlink(q, title=None, message=None):
 
     q_trim = q.strip('_')
