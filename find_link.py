@@ -290,6 +290,22 @@ def test_find_link_in_content():
     assert c == otrain.replace('turnstile', '[[turnstile]]')
     assert r == 'turnstile'
 
+    sample = """On April 26, 2006, Snoop Dogg and members of his entourage were arrested after being turned away from [[British Airways]]' first class lounge at [[Heathrow Airport]]. Snoop and his party were not allowed to enter the lounge because some of the entourage were flying first class, other members in economy class. After the group was escorted outside, they vandalized a duty-free shop by throwing whiskey bottles. Seven police officers were injured in the midst of the disturbance. After a night in prison, Snoop and the other men were released on bail on April 27, but he was unable to perform at the Premier Foods People's Concert in [[Johannesburg]] on the same day. As part of his bail conditions, he had to return to the police station in May. The group has been banned by British Airways for "the foreseeable future."<ref>{{cite news|url=http://news.bbc.co.uk/1/hi/entertainment/4949430.stm |title=Rapper Snoop Dogg freed on bail |publisher=BBC News  |date=April 27, 2006 |accessdate=January 9, 2011}}</ref><ref>{{cite news|url=http://news.bbc.co.uk/1/hi/entertainment/4953538.stm |title=Rap star to leave UK after arrest |publisher=BBC News  |date=April 28, 2006 |accessdate=January 9, 2011}}</ref> When Snoop Dogg appeared at a London police station on May 11, he was cautioned for [[affray]] under [[Fear or Provocation of Violence|Section 4]] of the [[Public Order Act 1986|Public Order Act]] for use of threatening words or behavior.<ref>{{cite news|url=http://newsvote.bbc.co.uk/1/hi/entertainment/4761553.stm|title=Rap star is cautioned over brawl |date=May 11, 2006|publisher=BBC News |accessdate=July 30, 2009}}</ref> On May 15, the [[Home Office]] decided that Snoop Dogg should be denied entry to the United Kingdom for the foreseeable future due to the incident at Heathrow as well as his previous convictions in the United States for drugs and firearms offenses.<ref>{{cite web|url=http://soundslam.com/articles/news/news.php?news=060516_snoopb |title=Soundslam News |publisher=Soundslam.com |date=May 16, 2006 |accessdate=January 9, 2011}}</ref><ref>{{cite web|url=http://uk.news.launch.yahoo.com/dyna/article.html?a=/060516/340/gbrj1.html&e=l_news_dm |title=Snoop 'banned from UK' |publisher=Uk.news.launch.yahoo.com |accessdate=January 9, 2011}}</ref> Snoop Dogg's visa card was rejected by local authorities on March 24, 2007 because of the Heathrow incident.<ref>{{cite news |first=VOA News |title=Rapper Snoop Dogg Arrested in UK |date=April 27, 2006 |publisher=Voice of America |url=http://classic-web.archive.org/web/20060603120934/http://voanews.com/english/archive/2006-04/2006-04-27-voa17.cfm |work=VOA News |accessdate=December 31, 2008}}</ref> A concert at London's Wembley Arena on March 27 went ahead with Diddy (with whom he toured Europe) and the rest of the show."""
+
+    (c, r) = find_link_in_content('duty-free shop', sample)
+    assert c == sample.replace('duty-free shop', '[[duty-free shop]]')
+    assert r == 'duty-free shop'
+
+    pseudocode1 = 'These languages are typically [[Dynamic typing|dynamically typed]], meaning that variable declarations and other [[Boilerplate_(text)#Boilerplate_code|boilerplate code]] can be omitted.'
+    (c, r) = find_link_in_content('boilerplate code', pseudocode1)
+    assert c == pseudocode1.replace('Boilerplate_(text)#Boilerplate_code|', '')
+    assert r == 'boilerplate code'
+
+    pseudocode2 = 'Large amounts of [[boilerplate (text)#Boilerplate code|boilerplate]] code, such as manual definitions of type casting macros and obscure type registration incantations, are necessary to create a new class.'
+    (c, r) = find_link_in_content('boilerplate code', pseudocode2)
+    assert c == pseudocode2.replace('(text)#Boilerplate code|boilerplate]] code', 'code]]')
+    assert r == 'boilerplate code'
+
     station = 'Ticket barriers control access to all platforms, although the bridge entrance has no barriers.'
     (c, r) = find_link_in_content('ticket barriers', station, linkto='turnstile')
     assert c == station.replace('Ticket barriers', '[[Turnstile|Ticket barriers]]')
@@ -365,15 +381,17 @@ trans2 = { ' ': r"('?s?\]\])?'?s? ?(\[\[)?" }
 trans2[en_dash] = trans2[' ']
 
 patterns = [
-    lambda q: re.compile('(%s)%s' % (q[0], q[1:]), re.I),
-    lambda q: re.compile('(%s)%s' % (q[0], ''.join(trans.get(c, c) for c in q[1:])), re.I),
+    lambda q: re.compile(r'\[\[[^\]|]+\|(%s)%s\]\]' % (q[0], q[1:]), re.I),
+    lambda q: re.compile(r'\[\[[^\]|]+\|(%s)%s(?:\]\])?' % (q[0], ''.join('-?' + trans2.get(c, c) for c in q[1:])), re.I),
+    lambda q: re.compile(r'(%s)%s' % (q[0], q[1:]), re.I),
+    lambda q: re.compile(r'(%s)%s' % (q[0], ''.join(trans.get(c, c) for c in q[1:])), re.I),
     lambda q: re.compile(r'(?:\[\[(?:[^]]+\|)?)?(%s)%s(?:\]\])?' % (q[0], ''.join('-?' + trans2.get(c, c) for c in q[1:])), re.I),
 ]
 
 def test_patterns():
     q = 'San Francisco'
-    assert patterns[0](q).pattern == '(S)' + q[1:]
-    assert patterns[1](q).pattern == '(S)an *[-\n]? *' + q[4:]
+    assert patterns[2](q).pattern == '(S)' + q[1:]
+    assert patterns[3](q).pattern == '(S)an *[-\n]? *' + q[4:]
 
 def match_found(m, q, linkto):
     if q[1:] == m.group(0)[1:]:

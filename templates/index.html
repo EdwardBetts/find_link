@@ -39,6 +39,9 @@ span.searchmatch { font-weight: bold; }
     <a href="http://en.wikipedia.org/wiki/{{esc_q}}">view article</a>
 {% endif %}
 </form>
+
+<a href="/find_link">Find link</a> is a tool written by <a href="/">Edward Betts</a>.<p>
+
 {% if q %}
     {% if longer_titles %}
         Longer titles found:
@@ -66,7 +69,7 @@ span.searchmatch { font-weight: bold; }
         {% if redirect_to %}
             {% set params = params + '&linkto=' + urlquote(redirect_to) %}
         {% endif %}
-        <a href="{{url_for('index')}}?{{params}}" target="_blank">{{doc.title}}</a> ({{commify(doc.wordcount)}} words)
+        <a href="{{url_for('index')}}?{{params}}" rel="nofollow" target="_blank">{{doc.title}}</a> ({{commify(doc.wordcount)}} words)
         {% if doc.match == 'exact' %}<span class="exact">exact match in snippet</span>{% endif %}
         {% if doc.match == 'case_mismatch' %}<span class="case_mismatch">case mismatch in snippet</span>{% endif %}
         {% if not doc.match %}<span class="nomatch">no match in snippet</span>{% endif %}
