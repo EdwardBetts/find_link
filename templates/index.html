@@ -102,15 +102,11 @@ table.diff td div{ word-wrap:break-word; overflow:auto}
         {% if redirect_to %}
             {% set params = params + '&linkto=' + urlquote(redirect_to) %}
         {% endif %}
-<<<<<<< HEAD
         {% set save_url = url_for('index') + '?' + params %}
         {#<span id="save{{num}}" style="display:none"><a href="{{save_url}}" target="_blank">save</a></span> #}
         <a href="{{save_url}}" target="_blank">{{ doc.title }}</a>
         ({{commify(doc.wordcount)}} words)
         <a href="javascript:diffview('{{params}}', {{num}})">[view diff]</a> 
-=======
-        <a href="{{url_for('index')}}?{{params}}" rel="nofollow" target="_blank">{{doc.title}}</a> ({{commify(doc.wordcount)}} words)
->>>>>>> a28df9a90284038c8e055e77434647d5d2fb5788
         {% if doc.match == 'exact' %}<span class="exact">exact match in snippet</span>{% endif %}
         {% if doc.match == 'case_mismatch' %}<span class="case_mismatch">case mismatch in snippet</span>{% endif %}
         {% if not doc.match %}<span class="nomatch">no match in snippet</span>{% endif %}
