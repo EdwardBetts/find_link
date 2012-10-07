@@ -569,28 +569,45 @@ def find_link_and_section(q, content, linkto=None):
             return find_link_and_section(linkto, content)
         except NoMatch:
             pass
-    re_link = re.compile('([%s%s])%s' % (q[0].lower(), q[0].upper(), q[1:]))
     sections = list(section_iter(content))
     replacement = None
-    for pattern in patterns:
-        re_link = pattern(q)
-        for section_num, (header, section_text) in enumerate(sections):
-            new_content = ''
-            if header:
-                new_content += header 
-            for token_type, text in parse_cite(section_text):
-                if token_type == 'text' and not replacement:
-                    m = re_link.search(text)
-                    if m:
-                        replacement = match_found(m, q, linkto)
-                        text = re_link.sub(lambda m: "[[%s]]" % replacement, text, count=1)
-                new_content += text
-            if replacement:
-                return {
-                    'section_num': section_num,
-                    'section_text': new_content.strip(),
-                    'replacement': replacement,
-                }
+
+    re_links = [p(q) for p in patterns]
+
+    for section_num, (header, section_text) in enumerate(sections):
+        new_content = ''
+        if header:
+            new_content += header 
+        for token_type, text in parse_cite(section_text):
+            if token_type == 'text' and not replacement:
+                new_text = ''
+                for token_type2, text2 in parse_links(content):
+                    if token_type2 == 'link' and not replacement:
+                        link_text = text2[2:-2]
+                        if '|' in link_text:
+                            link_dest, link_text = link_text.split('|', 1)
+                        for re_link in re_links:
+                            m = re_link.search(link_text)
+                            if m:
+                                replacement = match_found(m, q, None)
+                                text2 = re_link.sub(lambda m: "[[%s]]" % replacement, link_text, count=1)
+                                break
+                    new_text += text2
+                if replacement:
+                    text = new_text
+                else:
+                    for re_link in re_links:
+                        m = re_link.search(text)
+                        if m:
+                            replacement = match_found(m, q, linkto)
+                            text = re_link.sub(lambda m: "[[%s]]" % replacement, text, count=1)
+            new_content += text
+        if replacement:
+            return {
+                'section_num': section_num,
+                'section_text': new_content.strip(),
+                'replacement': replacement,
+            }
     raise NoMatch
 
 def test_get_case_from_content(): # test is broken
