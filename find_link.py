@@ -236,14 +236,16 @@ def wiki_backlink(q):
 def test_en_dash():
     title = u'obsessive\u2013compulsive disorder'
     content = 'This is a obsessive-compulsive disorder test'
-    (c, r) = find_link_in_content(title, content)
-    assert r == title
-    assert c == u'This is a [[obsessive\u2013compulsive disorder]] test'
+    for func in find_link_in_content, find_link_in_text:
+        (c, r) = func(title, content)
+        assert r == title
+        assert c == u'This is a [[obsessive\u2013compulsive disorder]] test'
 
     content = 'This is a [[obsessive-compulsive]] disorder test'
-    (c, r) = find_link_in_content(title, content)
-    assert r == title
-    assert c == u'This is a [[obsessive\u2013compulsive disorder]] test'
+    for func in find_link_in_content, find_link_in_text:
+        (c, r) = func(title, content)
+        assert r == title
+        assert c == u'This is a [[obsessive\u2013compulsive disorder]] test'
 
 def test_avoid_link_in_heading():
     tp = 'test phrase'
@@ -318,19 +320,23 @@ def test_find_link_in_content():
     assert r == 'duty-free shop'
 
     pseudocode1 = 'These languages are typically [[Dynamic typing|dynamically typed]], meaning that variable declarations and other [[Boilerplate_(text)#Boilerplate_code|boilerplate code]] can be omitted.'
-    (c, r) = find_link_in_content('boilerplate code', pseudocode1)
-    assert c == pseudocode1.replace('Boilerplate_(text)#Boilerplate_code|', '')
-    assert r == 'boilerplate code'
+
+    for func in find_link_in_content, find_link_in_text:
+        (c, r) = func('boilerplate code', pseudocode1)
+        assert c == pseudocode1.replace('Boilerplate_(text)#Boilerplate_code|', '')
+        assert r == 'boilerplate code'
 
     pseudocode2 = 'Large amounts of [[boilerplate (text)#Boilerplate code|boilerplate]] code, such as manual definitions of type casting macros and obscure type registration incantations, are necessary to create a new class.'
-    (c, r) = find_link_in_content('boilerplate code', pseudocode2)
-    assert c == pseudocode2.replace('(text)#Boilerplate code|boilerplate]] code', 'code]]')
-    assert r == 'boilerplate code'
+    for func in find_link_in_content, find_link_in_text:
+        (c, r) = func('boilerplate code', pseudocode2)
+        assert c == pseudocode2.replace('(text)#Boilerplate code|boilerplate]] code', 'code]]')
+        assert r == 'boilerplate code'
 
-    yard = "Allentown is a regional center for commercial freight rail traffic. Currently, [[Norfolk Southern Railway|Norfolk Southern's]] primary [[Hump yard|hump classification yards]] are located in Allentown."
-    (c, r) = find_link_in_content('classification yard', yard)
-    assert c == yard.replace('[[Hump yard|hump classification yards]]', 'hump [[classification yard]]s')
-    assert r == 'classification yard'
+    yard = "primary [[Hump yard|hump classification yards]] are located in Allentown."
+    for func in find_link_in_content, find_link_in_text:
+        (c, r) = find_link_in_text('classification yard', yard)
+        assert c == yard.replace('[[Hump yard|hump classification yards]]', 'hump [[classification yard]]s')
+        assert r == 'classification yard'
 
     station = 'Ticket barriers control access to all platforms, although the bridge entrance has no barriers.'
     (c, r) = find_link_in_content('ticket barriers', station, linkto='turnstile')
@@ -353,9 +359,10 @@ def test_find_link_in_content():
         'Able to find this testphrase in an article.']
 
     for input_content in content:
-        (c, r) = find_link_in_content('test phrase', input_content)
-        assert c == 'Able to find this [[test phrase]] in an article.'
-        assert r == 'test phrase'
+        for func in find_link_in_content, find_link_in_text:
+            (c, r) = func('test phrase', input_content)
+            assert c == 'Able to find this [[test phrase]] in an article.'
+            assert r == 'test phrase'
 
     global web_get
     title = 'London congestion charge'
@@ -366,8 +373,9 @@ def test_find_link_in_content():
     }}
 
     article = 'MyCar is exempt from the London Congestion Charge, road tax and parking charges.'
-    (c, r) = find_link_in_content('London congestion charge', article)
-    assert r == 'London congestion charge'
+    for func in find_link_in_content, find_link_in_text:
+        (c, r) = func('London congestion charge', article)
+        assert r == 'London congestion charge'
 
 class NoMatch(Exception):
     pass
@@ -439,30 +447,94 @@ def match_found(m, q, linkto):
         replacement = linkto + '|' + replacement
     return replacement
 
+re_link_in_text = re.compile(r'\[\[.*?\]\]', re.I | re.S)
+def parse_links(text):
+    prev = 0
+    for m in re_link_in_text.finditer(text):
+        yield ('text', text[prev:m.start()])
+        yield ('link', m.group(0))
+        prev = m.end()
+    yield ('text', text[prev:])
+
+def find_link_in_text_old(q, text):
+    for pattern in patterns:
+        re_link = pattern(q)
+        m = re_link.search(text)
+        if m:
+            replacement = match_found(m, q, None)
+            text = re_link.sub(lambda m: "[[%s]]" % replacement, text, count=1)
+            return (text, replacement)
+    raise NoMatch
+
+def find_link_in_text(q, content): 
+    new_content = ''
+    replacement = None
+
+    re_links = [p(q) for p in patterns]
+
+    for token_type, text in parse_links(content):
+        if token_type == 'link':
+            link_text = text[2:-2]
+            if '|' in link_text:
+                link_text = link_text[link_text.find('|')+1:]
+            for re_link in re_links:
+                m = re_link.search(link_text)
+                if m:
+                    replacement = match_found(m, q, None)
+                    text = re_link.sub(lambda m: "[[%s]]" % replacement, link_text, count=1)
+                    break
+        new_content += text
+    if replacement:
+        return (new_content, replacement)
+
+    for re_link in re_links:
+        m = re_link.search(content)
+        if m:
+            replacement = match_found(m, q, None)
+            content = re_link.sub(lambda m: "[[%s]]" % replacement, content, count=1)
+            return (content, replacement)
+    raise NoMatch
+
 def find_link_in_content(q, content, linkto=None):
     if linkto:
         try:
             return find_link_in_content(linkto, content)
         except NoMatch:
             pass
-    re_link = re.compile('([%s%s])%s' % (q[0].lower(), q[0].upper(), q[1:]))
     sections = list(section_iter(content))
+    re_links = [p(q) for p in patterns]
     replacement = None
-    for pattern in patterns:
-        re_link = pattern(q)
-        new_content = ''
-        for header, section_text in sections:
-            if header:
-                new_content += header 
-            for token_type, text in parse_cite(section_text):
-                if token_type == 'text' and not replacement:
-                    m = re_link.search(text)
-                    if m:
-                        replacement = match_found(m, q, linkto)
-                        text = re_link.sub(lambda m: "[[%s]]" % replacement, text, count=1)
-                new_content += text
-        if replacement:
-            return (new_content, replacement)
+    new_content = ''
+    for header, section_text in sections:
+        if header:
+            new_content += header 
+        for token_type, text in parse_cite(section_text):
+            if token_type == 'text' and not replacement:
+                new_text = ''
+                for token_type2, text2 in parse_links(content):
+                    if token_type == 'link' and not replacement:
+                        link_text = text2[2:-2]
+                        if '|' in link_text:
+                            link_text = link_text[link_text.find('|')+1:]
+                        for re_link in re_links:
+                            m = re_link.search(link_text)
+                            if m:
+                                replacement = match_found(m, q, None)
+                                text2 = re_link.sub(lambda m: "[[%s]]" % replacement, link_text, count=1)
+                                break
+                    new_text += text2
+                if replacement:
+                    text = new_text
+                else:
+                    for re_link in re_links:
+                        m = re_link.search(text)
+                        if m:
+                            replacement = match_found(m, q, linkto)
+                            text = re_link.sub(lambda m: "[[%s]]" % replacement, text, count=1)
+                            break
+            new_content += text
+    if replacement:
+        return (new_content, replacement)
     raise NoMatch
 
 def find_link_and_section(q, content, linkto=None):
