@@ -354,6 +354,12 @@ def test_find_link_in_content():
         assert c == yard.replace('[[Hump yard|hump classification yards]]', 'hump [[classification yard]]s')
         assert r == 'classification yard'
 
+    yard2 = 'A major [[hump yard|railway classification yard]] is north of Blenheim at [[Spring Creek, New Zealand|Spring Creek]].'
+    for func in find_link_in_content, find_link_in_text:
+        (c, r) = func('classification yard', yard2)
+        assert c == yard2.replace('[[hump yard|railway classification yard]]', 'railway [[classification yard]]')
+        assert r == 'classification yard'
+
     #yard2 = 'For the section from [[Rotterdam]] to the large [[Kijfhoek (classification yard)|classification yard Kijfhoek]] existing track was reconstructed, but three quarters of the line is new, from Kijfhoek to [[Zevenaar]] near the German border.'
     #(c, r) = find_link_in_text('classification yard', yard2)
 
