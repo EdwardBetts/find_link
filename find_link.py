@@ -537,7 +537,7 @@ def find_link_in_content(q, content, linkto=None):
         for token_type, text in parse_cite(section_text):
             if token_type == 'text' and not replacement:
                 new_text = ''
-                for token_type2, text2 in parse_links(content):
+                for token_type2, text2 in parse_links(text):
                     if token_type2 == 'link' and not replacement:
                         link_text = text2[2:-2]
                         if '|' in link_text:
@@ -581,7 +581,7 @@ def find_link_and_section(q, content, linkto=None):
         for token_type, text in parse_cite(section_text):
             if token_type == 'text' and not replacement:
                 new_text = ''
-                for token_type2, text2 in parse_links(content):
+                for token_type2, text2 in parse_links(text):
                     if token_type2 == 'link' and not replacement:
                         link_text = text2[2:-2]
                         if '|' in link_text:
