@@ -9,22 +9,55 @@
 </title>
 <link rel="shortcut icon" href="{{url_for('static', filename='Link_edit.png')}}" />
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.4.4/jquery.min.js"></script> 
-</head>
+<script>
+function diffview(params, num) {
+    $.get('{{url_for('diff_view')}}?' + params, function(data) {
+        $('#diff' + num).html('<table>' + data + '</table>');
+        // $('#save' + num).show();
+    });
+}
+</script>
 <style>
+body {
+    font-family: Arial, Helvetica, sans-serif;
+}
+
 span.exact { padding: 2px; background: green; color: white; font-weight: bold; }
 span.nomatch { padding: 2px; background: red; color: white; font-weight: bold; }
 span.case_mismatch { padding: 2px; background: orange; color: white; font-weight: bold; }
 span.searchmatch { font-weight: bold; }
 .flash { font-weight: bold; }
+
+table.diff,td.diff-otitle,td.diff-ntitle{background-color:white}
+td.diff-otitle,td.diff-ntitle{text-align:center}
+td.diff-marker{text-align:right;font-weight:bold;font-size:1.25em}
+td.diff-lineno{font-weight:bold}
+td.diff-addedline,td.diff-deletedline,td.diff-context{font-size:88%;vertical-align:top;white-space:-moz-pre-wrap;white-space:pre-wrap}
+td.diff-addedline,td.diff-deletedline{border-style:solid;border-width:1px 1px 1px 4px;border-radius:0.33em}
+td.diff-addedline{border-color:#a3d3ff}
+td.diff-deletedline{border-color:#ffe49c}
+td.diff-context{background:#f3f3f3;color:#333333;border-style:solid;border-width:1px 1px 1px 4px;border-color:#e6e6e6;border-radius:0.33em}
+.diffchange{font-weight:bold;text-decoration:none}
+table.diff{border:none;width:98%;border-spacing:4px; table-layout:fixed}
+td.diff-addedline .diffchange,td.diff-deletedline .diffchange{border-radius:0.33em;padding:0.25em 0}
+td.diff-addedline .diffchange{background:#d8ecff}
+td.diff-deletedline .diffchange{background:#feeec8}
+table.diff td{padding:0.33em 0.66em}
+table.diff col.diff-marker{width:2%}
+table.diff col.diff-content{width:48%}
+table.diff td div{ word-wrap:break-word; overflow:auto}
+
+
 </style>
+</head>
 <body>
 <h1>Find link</h1>
 {% if message %}
   <span class="flash">{{ message }}</span><br>
 {% endif %}
-<form action="{{url_for('index')}}">
-<input name="q" value="{{ q }}" size="60">
-<input type="submit" value="search">
+<form class="well form-search" action="{{url_for('index')}}">
+<input name="q" value="{{ q }}" class="input-medium search-query">
+<button type="submit" class="btn">Search</button>
 {% if q %}
     {% set esc_q = urlquote(q.replace(' ', '_')) %}
     <script>
@@ -39,6 +72,9 @@ span.searchmatch { font-weight: bold; }
     <a href="http://en.wikipedia.org/wiki/{{esc_q}}">view article</a>
 {% endif %}
 </form>
+
+<a href="/find_link">Find link</a> is a tool written by <a href="/">Edward Betts</a>.<p>
+
 {% if q %}
     {% if longer_titles %}
         Longer titles found:
@@ -59,14 +95,18 @@ span.searchmatch { font-weight: bold; }
         <a href="javascript:get_redirects()">redirect here</a><br>
         <div id="results"></div>
     {% endif %}
-    {% for doc in results %}
+    {% for num, doc in enumerate(results) %}
         {# <pre>{{ doc | pprint() }}</pre> #}
         {% set esc_title = urlquote(doc.title.replace(' ', '_')) %}
         {% set params = 'q=' + urlquote(q) + '&title=' + urlquote(doc.title) %}
         {% if redirect_to %}
             {% set params = params + '&linkto=' + urlquote(redirect_to) %}
         {% endif %}
-        <a href="{{url_for('index')}}?{{params}}" target="_blank">{{doc.title}}</a> ({{commify(doc.wordcount)}} words)
+        {% set save_url = url_for('index') + '?' + params %}
+        {#<span id="save{{num}}" style="display:none"><a href="{{save_url}}" target="_blank">save</a></span> #}
+        <a href="{{save_url}}" target="_blank">{{ doc.title }}</a>
+        ({{commify(doc.wordcount)}} words)
+        <a href="javascript:diffview('{{params}}', {{num}})">[view diff]</a> 
         {% if doc.match == 'exact' %}<span class="exact">exact match in snippet</span>{% endif %}
         {% if doc.match == 'case_mismatch' %}<span class="case_mismatch">case mismatch in snippet</span>{% endif %}
         {% if not doc.match %}<span class="nomatch">no match in snippet</span>{% endif %}
@@ -74,6 +114,7 @@ span.searchmatch { font-weight: bold; }
         <a href="{{url_for('findlink', q=doc.title.replace(' ', '_'))}}" target="_blank">find links to article</a>
         <br>
         <blockquote>{{ doc.snippet }}</blockquote>
+        <div id="diff{{num}}"></div>
     {% endfor %}
 {% endif %}
 </body>
