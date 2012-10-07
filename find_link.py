@@ -532,10 +532,10 @@ def find_link_in_content(q, content, linkto=None):
             if token_type == 'text' and not replacement:
                 new_text = ''
                 for token_type2, text2 in parse_links(content):
-                    if token_type == 'link' and not replacement:
+                    if token_type2 == 'link' and not replacement:
                         link_text = text2[2:-2]
                         if '|' in link_text:
-                            link_text = link_text[link_text.find('|')+1:]
+                            link_dest, link_text = link_text.split('|', 1)
                         for re_link in re_links:
                             m = re_link.search(link_text)
                             if m:
