@@ -4,15 +4,15 @@
 </head>
 <body>
 
-<form id="upload" method=post enctype="multipart/form-data" action="http://en.wikipedia.org/w/index.php?title={{urlquote(title)}}&action=edit" style="display:inline">
+<form id="upload" method="post" enctype="multipart/form-data" action="http://en.wikipedia.org/w/index.php?title={{urlquote(title)}}&action=edit" style="display:inline">
 <input type="hidden" name="wpTextbox1" value="{{ content }}">
 <input type="hidden" name="wpSummary" value="{{summary}}">
-<input type="hidden" value="{{start_time}}" name="wpStarttime" />
-<input type="hidden" value="{{timestamp}}" name="wpEdittime" />
+<input type="hidden" name="wpStarttime" value="{{start_time}}">
+<input type="hidden" name="wpEdittime" value="{{timestamp}}"> 
 <input type="hidden" name="wpDiff" value="wpDiff">
-<input type="hidden" value="1" name="wpMinoredit">
+<input type="hidden" name="wpMinoredit" value="1">
 
-<input id="thebutton" type="submit" name="wpDiff" value="Show changes"/>
+<input id="thebutton" type="submit" name="wpSave" value="Save page">
 </form>
 <body onload="document.getElementById('thebutton').click();">
 

@@ -600,7 +600,7 @@ def test_match_type():
     assert match_type('foo-bar', 'aa foo-bar cc') == 'exact'
     assert match_type(u'foo\u2013bar', 'aa foo-bar cc') == 'exact'
 
-@app.route("/<q>")
+@app.route("/<path:q>")
 def findlink(q, title=None, message=None):
     q_trim = q.strip('_')
     if not message and (' ' in q or q != q_trim):
