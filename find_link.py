@@ -360,6 +360,12 @@ def test_find_link_in_content():
         assert c == yard2.replace('[[hump yard|railway classification yard]]', 'railway [[classification yard]]')
         assert r == 'classification yard'
 
+    yard3 = 'Five houses were destroyed and three others were damaged. A high school was also heavily damaged and railroad cars were thrown in a small freight classification yard. Four people were injured.'
+    for func in find_link_in_content, find_link_in_text:
+        (c, r) = func('classification yard', yard3)
+        assert c == yard3.replace('classification yard', '[[classification yard]]')
+        assert r == 'classification yard'
+
     #yard2 = 'For the section from [[Rotterdam]] to the large [[Kijfhoek (classification yard)|classification yard Kijfhoek]] existing track was reconstructed, but three quarters of the line is new, from Kijfhoek to [[Zevenaar]] near the German border.'
     #(c, r) = find_link_in_text('classification yard', yard2)
 
@@ -601,6 +607,7 @@ def find_link_and_section(q, content, linkto=None):
                         if m:
                             replacement = match_found(m, q, linkto)
                             text = re_link.sub(lambda m: "[[%s]]" % replacement, text, count=1)
+                            break
             new_content += text
         if replacement:
             return {
