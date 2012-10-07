@@ -211,6 +211,22 @@ def norm(s):
     s = re_non_letter.sub('', s).lower()
     return s[:-1] if s and s[-1] == 's' else s
 
+re_redirect = re.compile(r'#REDIRECT \[\[(.)([^#]*?)(#.*)?\]\]')
+
+def is_redirect_to(title_from, title_to):
+    title_from = title_from.replace('_', ' ')
+    ret = web_get('prop=info&titles=' + urlquote(title_from))
+    print query_url + 'prop=info&titles=' + urlquote(title_from)
+    if 'redirect' not in ret['query']['pages'].values()[0]:
+        return False
+
+    params = 'prop=revisions&rvprop=content&titles='
+    ret = web_get(params + urlquote(title_from))
+    page_text = ret['query']['pages'].values()[0]['revisions'][0]['*']
+    m = re_redirect.match(page_text)
+    title_to = title_to[0].upper() + title_to[1:]
+    return m.group(1).upper() + m.group(2) == title_to
+
 def test_norm():
     assert norm('X') == 'x'
     assert norm('Tables') == 'table'
@@ -334,9 +350,12 @@ def test_find_link_in_content():
 
     yard = "primary [[Hump yard|hump classification yards]] are located in Allentown."
     for func in find_link_in_content, find_link_in_text:
-        (c, r) = find_link_in_text('classification yard', yard)
+        (c, r) = func('classification yard', yard)
         assert c == yard.replace('[[Hump yard|hump classification yards]]', 'hump [[classification yard]]s')
         assert r == 'classification yard'
+
+    #yard2 = 'For the section from [[Rotterdam]] to the large [[Kijfhoek (classification yard)|classification yard Kijfhoek]] existing track was reconstructed, but three quarters of the line is new, from Kijfhoek to [[Zevenaar]] near the German border.'
+    #(c, r) = find_link_in_text('classification yard', yard2)
 
     station = 'Ticket barriers control access to all platforms, although the bridge entrance has no barriers.'
     (c, r) = find_link_in_content('ticket barriers', station, linkto='turnstile')
@@ -447,7 +466,7 @@ def match_found(m, q, linkto):
         replacement = linkto + '|' + replacement
     return replacement
 
-re_link_in_text = re.compile(r'\[\[.*?\]\]', re.I | re.S)
+re_link_in_text = re.compile(r'\[\[[^]]+?\]\]', re.I | re.S)
 def parse_links(text):
     prev = 0
     for m in re_link_in_text.finditer(text):
@@ -475,8 +494,9 @@ def find_link_in_text(q, content):
     for token_type, text in parse_links(content):
         if token_type == 'link':
             link_text = text[2:-2]
+            link_dest = None
             if '|' in link_text:
-                link_text = link_text[link_text.find('|')+1:]
+                link_dest, link_text = link_text.split('|', 1)
             for re_link in re_links:
                 m = re_link.search(link_text)
                 if m:
