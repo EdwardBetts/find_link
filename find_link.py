@@ -662,11 +662,15 @@ def diff_view():
 
     return '<table>' + diff + '</table>'
 
-def get_page(title, q, linkto=None):
+def get_content_and_timestamp(title):
     ret = web_get(content_params + urlquote(title))
     rev = ret['query']['pages'].values()[0]['revisions'][0]
     content = rev['*']
     timestamp = rev['timestamp']
+    return (content, timestamp)
+
+def get_page(title, q, linkto=None):
+    content, timestamp = get_content_and_timestamp(title)
     timestamp = ''.join(c for c in timestamp if c.isdigit())
 
     try:
@@ -722,29 +726,15 @@ def test_match_type():
     assert match_type('foo-bar', 'aa foo-bar cc') == 'exact'
     assert match_type(u'foo\u2013bar', 'aa foo-bar cc') == 'exact'
 
-@app.route("/<path:q>")
-def findlink(q, title=None, message=None):
-    q_trim = q.strip('_')
-    if not message and (' ' in q or q != q_trim):
-        return redirect(url_for('findlink', q=q.replace(' ', '_').strip('_'), message=message))
-    q = q.replace('_', ' ').strip()
-    try:
-        redirect_to = get_wiki_info(q)
-    except Missing:
-        return render_template('index.html', message=q + " isn't an article")
-    #if redirect_to:
-    #    return redirect(url_for('findlink', q=redirect_to.replace(' ', '_')))
-    if redirect_to:
-        if q[0].isupper():
-            redirect_to = redirect_to[0].upper() +  redirect_to[1:]
-        elif q[0].islower():
-            redirect_to = redirect_to[0].lower() +  redirect_to[1:]
+def do_search(q, redirect_to):
     this_title = q[0].upper() + q[1:]
-    (totalhits, search) = wiki_search(q)
-    (articles, redirects) = wiki_backlink(redirect_to or q)
+
+    totalhits, search = wiki_search(q)
+    articles, redirects = wiki_backlink(redirect_to or q)
     cm = set()
     for cat in set(['Category:' + this_title] + cat_start(q)):
         cm.update(categorymembers(cat))
+
     norm_q = norm(q)
     norm_match_redirect = set(r for r in redirects if norm(r) == norm_q)
     longer_redirect = set(r for r in redirects if q.lower() in r.lower())
@@ -752,6 +742,8 @@ def findlink(q, title=None, message=None):
     articles.add(this_title)
     if redirect_to:
         articles.add(redirect_to[0].upper() + redirect_to[1:])
+
+    longer_redirect = set(r for r in redirects if q.lower() in r.lower())
     for r in norm_match_redirect | longer_redirect:
         articles.add(r)
         a2, r2 = wiki_backlink(r)
@@ -764,7 +756,7 @@ def findlink(q, title=None, message=None):
         lt = doc['title'].lower()
         if lt != lt and lq in lt:
             articles.add(doc['title'])
-            (more_articles, more_redirects) = wiki_backlink(doc['title'])
+            more_articles, more_redirects = wiki_backlink(doc['title'])
             articles.update(more_articles)
             if doc['title'] not in longer:
                 longer.append(doc['title'])
@@ -777,17 +769,46 @@ def findlink(q, title=None, message=None):
         for doc in search:
             without_markup = doc['snippet'].replace("<span class='searchmatch'>", "").replace("</span>", "").replace('  ', ' ')
             doc['match'] = match_type(q, without_markup)
-            doc['snippet'] = Markup(doc['snippet'])
+            doc['snippet_without_markup'] = without_markup
+    return {
+        'totalhits': totalhits,
+        'results': search,
+        'longer': longer,
+    }
+
+@app.route("/<path:q>")
+def findlink(q, title=None, message=None):
+    q_trim = q.strip('_')
+    if not message and (' ' in q or q != q_trim):
+        return redirect(url_for('findlink', q=q.replace(' ', '_').strip('_'), message=message))
+    q = q.replace('_', ' ').strip()
+
+    try:
+        redirect_to = get_wiki_info(q)
+    except Missing:
+        return render_template('index.html', message=q + " isn't an article")
+    #if redirect_to:
+    #    return redirect(url_for('findlink', q=redirect_to.replace(' ', '_')))
+    if redirect_to:
+        if q[0].isupper():
+            redirect_to = redirect_to[0].upper() +  redirect_to[1:]
+        elif q[0].islower():
+            redirect_to = redirect_to[0].lower() +  redirect_to[1:]
+
+    ret = do_search(q, redirect_to)
+
+    for doc in ret['results']:
+        doc['snippet'] = Markup(doc['snippet'])
+
     return render_template('index.html', q=q,
-        totalhits = totalhits,
+        totalhits = ret['totalhits'],
         message = message,
-        results = search,
+        results = ret['results'],
         urlquote = urlquote,
         commify = commify,
         enumerate = enumerate,
-        longer_titles = longer,
+        longer_titles = ret['longer'],
         redirect_to = redirect_to,
-        norm_match_redirect = norm_match_redirect,
         case_flip_first = case_flip_first)
 
 @app.route("/favicon.ico")
