@@ -17,8 +17,7 @@ search_params = 'list=search&srwhat=text&srlimit=50&srsearch='
 new_page_params = 'list=recentchanges&rclimit=50&rctype=new&rcnamespace=0&rcshow=!redirect'
 backlink_params = 'list=backlinks&bllimit=500&blnamespace=0&bltitle='
 redirect_params = 'list=backlinks&blfilterredir=redirects&bllimit=500&blnamespace=0&bltitle='
-content_params = 'prop=revisions&rvprop=content|timestamp&titles='
-content_params2 = 'prop=revisions|info&rvprop=content|timestamp&titles='
+content_params = 'prop=revisions|info&rvprop=content|timestamp&titles='
 link_params = 'prop=links&pllimit=500&plnamespace=0&titles='
 templates_params = 'prop=templates&tllimit=500&tlnamespace=10&titles='
 allpages_params = 'list=allpages&apnamespace=0&apfilterredir=nonredirects&aplimit=500&apprefix='
@@ -29,11 +28,7 @@ cat_start_params = 'list=allpages&apnamespace=14&apfilterredir=nonredirects&apli
 save_to_cache = False
 
 def commify(amount):
-    amount = str(amount)
-    firstcomma = len(amount)%3 or 3  # set to 3 if would make a leading comma
-    first, rest = amount[:firstcomma], amount[firstcomma:]
-    segments = [first] + [rest[i:i+3] for i in range(0, len(rest), 3)]
-    return ",".join(segments)
+    return '{:,}'.format(int(amount))
 
 def test_commify():
     assert commify(1) == '1'
@@ -73,7 +68,11 @@ def web_get(params):
         print >> out, params
         print >> out, data
         out.close()
-    return json.loads(data)
+    try:
+        return json.loads(data)
+    except ValueError:
+        print data
+        raise
 
 def web_post(params):
     data = urllib.urlopen('https://en.wikipedia.org/w/api.php', 'format=json&action=query&' + params).read()
@@ -239,6 +238,8 @@ def wiki_redirects(q): # pages that link here
 
 def wiki_backlink(q):
     ret = web_get(backlink_params + urlquote(q))
+    if 'query' not in ret:
+        pprint(ret)
     docs = ret['query']['backlinks']
     while 'query-continue' in ret:
         blcontinue = ret['query-continue']['backlinks']['blcontinue']
@@ -334,6 +335,40 @@ def test_find_link_in_content():
     (c, r) = find_link_in_content('duty-free shop', sample)
     assert c == sample.replace('duty-free shop', '[[duty-free shop]]')
     assert r == 'duty-free shop'
+
+    sample = '[[Retriever]]s are typically used when [[waterfowl]] hunting. Since a majority of waterfowl hunting employs the use of small boats'
+
+    for func in find_link_in_content, find_link_in_text:
+        (c, r) = func('waterfowl hunting', sample)
+        assert c == sample.replace(']] hunting', ' hunting]]')
+        assert r == 'waterfowl hunting'
+
+    sample = 'abc [[File:Lufschiffhafen Jambol.jpg|thumb|right|Jamboli airship hangar in Bulgaria]] abc'
+    q = 'airship hangar'
+    for func in find_link_in_content, find_link_in_text:
+        (c, r) = func(q, sample)
+        assert c == sample.replace(q, '[[' + q + ']]')
+        assert r == q
+
+    sample = 'It is relatively easy for insiders to capture insider-trading like gains through the use of "open market repurchases."  Such transactions are legal and generally encouraged by regulators through safeharbours against insider trading liability.'
+    q = 'insider trading'
+
+    q = 'ski mountaineering' # Germán Cerezo Alonso 
+    sample = 'started ski mountaineering in 1994 and competed first in the 1997 Catalunyan Championship. He finished fifth in the relay event of the [[2005 European Championship of Ski Mountaineering]].'
+
+    for func in find_link_in_content, find_link_in_text:
+        (c, r) = func(q, sample)
+        assert c == sample.replace(q, '[[' + q + ']]')
+        assert r == q
+
+    q = 'two-factor authentication'
+    sample = "Two factor authentication is a 'strong authentication' method as it"
+
+    #for func in find_link_in_content, find_link_in_text:
+    for func in [find_link_in_text]:
+        (c, r) = func(q, sample)
+        assert c == "[[Two-factor authentication]] is a 'strong authentication' method as it"
+        assert r == q[0].upper() + q[1:]
 
     pseudocode1 = 'These languages are typically [[Dynamic typing|dynamically typed]], meaning that variable declarations and other [[Boilerplate_(text)#Boilerplate_code|boilerplate code]] can be omitted.'
 
@@ -442,21 +477,21 @@ en_dash = u'\u2013'
 trans = { ',': ',?', ' ': ' *[-\n]? *' }
 trans[en_dash] = trans[' ']
 
-trans2 = { ' ': r"('?s?\]\])?'?s? ?(\[\[)?" }
+trans2 = { ' ': r"('?s?\]\])?'?s? ?(\[\[)?", '-': '[- ]' }
 trans2[en_dash] = trans2[' ']
 
 patterns = [
+    lambda q: re.compile(r'(?:\[\[(?:[^]]+\|)?)?(%s)%s(?:\]\])?' % (q[0], ''.join('-?' + trans2.get(c, c) for c in q[1:])), re.I),
     lambda q: re.compile('\[\[[^|]+\|(%s)%s\]\]' % (q[0], q[1:]), re.I),
     lambda q: re.compile('\[\[[^|]+\|(%s)%s(?:\]\])?' % (q[0], ''.join('-?' + trans2.get(c, c) for c in q[1:])), re.I),
     lambda q: re.compile('(%s)%s' % (q[0], q[1:]), re.I),
     lambda q: re.compile('(%s)%s' % (q[0], ''.join(trans.get(c, c) for c in q[1:])), re.I),
-    lambda q: re.compile(r'(?:\[\[(?:[^]]+\|)?)?(%s)%s(?:\]\])?' % (q[0], ''.join('-?' + trans2.get(c, c) for c in q[1:])), re.I),
 ]
 
 def test_patterns():
     q = 'San Francisco'
-    assert patterns[2](q).pattern == '(S)' + q[1:]
-    assert patterns[3](q).pattern == '(S)an *[-\n]? *' + q[4:]
+    assert patterns[3](q).pattern == '(S)' + q[1:]
+    assert patterns[4](q).pattern == '(S)an *[-\n]? *' + q[4:]
 
 def match_found(m, q, linkto):
     if q[1:] == m.group(0)[1:]:
@@ -464,6 +499,7 @@ def match_found(m, q, linkto):
     elif any(c.isupper() for c in q[1:]) or m.group(0) == m.group(0).upper():
         replacement = q
     elif is_title_case(m.group(0)):
+        replacement = None
         replacement = get_case_from_content(q)
         if replacement is None:
             replacement = q.lower()
@@ -482,10 +518,15 @@ re_link_in_text = re.compile(r'\[\[[^]]+?\]\]', re.I | re.S)
 def parse_links(text):
     prev = 0
     for m in re_link_in_text.finditer(text):
-        yield ('text', text[prev:m.start()])
-        yield ('link', m.group(0))
+        if prev != m.start():
+            yield ('text', text[prev:m.start()])
+        if any(m.group().lower().startswith('[[' + prefix) for prefix in ('file:', 'image:')):
+            yield ('image', m.group(0))
+        else:
+            yield ('link', m.group(0))
         prev = m.end()
-    yield ('text', text[prev:])
+    if prev < len(text):
+        yield ('text', text[prev:])
 
 def find_link_in_text_old(q, text):
     for pattern in patterns:
@@ -503,15 +544,34 @@ def find_link_in_text(q, content):
 
     re_links = [p(q) for p in patterns]
 
+    match_in_non_link = False
     for token_type, text in parse_links(content):
-        if token_type == 'link':
+        print (token_type, text)
+        if token_type == 'text':
+            for re_link in re_links:
+                print re_link.pattern
+                m = re_link.search(text)
+                if m:
+                    match_in_non_link = True
+        elif token_type == 'image':
+            last_pipe = text.rfind('|')
+            link_text = text[last_pipe+1:-2]
+            for re_link in re_links:
+                m = re_link.search(link_text)
+                if m:
+                    replacement = match_found(m, q, None)
+                    text = text[:last_pipe+1] + \
+                        re_link.sub(lambda m: "[[%s]]" % replacement, link_text, count=1) + ']]'
+                    break
+
+        elif token_type == 'link':
             link_text = text[2:-2]
             link_dest = None
             if '|' in link_text:
                 link_dest, link_text = link_text.split('|', 1)
             for re_link in re_links:
                 m = re_link.search(link_text)
-                if m:
+                if m and not match_in_non_link:
                     replacement = match_found(m, q, None)
                     text = re_link.sub(lambda m: "[[%s]]" % replacement, link_text, count=1)
                     break
@@ -543,14 +603,20 @@ def find_link_in_content(q, content, linkto=None):
         for token_type, text in parse_cite(section_text):
             if token_type == 'text' and not replacement:
                 new_text = ''
+                match_in_non_link = False
                 for token_type2, text2 in parse_links(text):
+                    if token_type2 == 'text':
+                        for re_link in re_links:
+                            m = re_link.search(text2)
+                            if m:
+                                match_in_non_link = True
                     if token_type2 == 'link' and not replacement:
                         link_text = text2[2:-2]
                         if '|' in link_text:
                             link_dest, link_text = link_text.split('|', 1)
                         for re_link in re_links:
                             m = re_link.search(link_text)
-                            if m:
+                            if m and not match_in_non_link:
                                 replacement = match_found(m, q, None)
                                 text2 = re_link.sub(lambda m: "[[%s]]" % replacement, link_text, count=1)
                                 break
@@ -641,24 +707,10 @@ def diff_view():
     title = request.args.get('title')
     linkto = request.args.get('linkto')
 
-    ret = web_get(content_params2 + urlquote(title))
-    page = ret['query']['pages'].values()[0]
-    #edittoken = page['edittoken']
-    #print 'token:', edittoken
-    rev = page['revisions'][0]
-    content = rev['*']
     try:
-        found = find_link_and_section(q, content, linkto)
+        diff = get_diff(q, title, linkto)
     except NoMatch:
         return None
-
-    #print found['section_num'], found['replacement'], len(found['section_text'])
-
-    diff_params = "prop=revisions&rvprop=timestamp&titles=%s&rvsection=%d&rvdifftotext=%s" % (urlquote(title), found['section_num'], urlquote(found['section_text']))
-
-    ret = web_post(diff_params)
-    diff = ret['query']['pages'].values()[0]['revisions'][0]['diff']['*']
-    #pprint(ret['query']['pages'].values()[0])
 
     return '<table>' + diff + '</table>'
 
@@ -668,6 +720,16 @@ def get_content_and_timestamp(title):
     content = rev['*']
     timestamp = rev['timestamp']
     return (content, timestamp)
+
+def get_diff(q, title, linkto):
+    content, timestamp = get_content_and_timestamp(title)
+    found = find_link_and_section(q, content, linkto)
+
+    diff_params = "prop=revisions&rvprop=timestamp&titles=%s&rvsection=%d&rvdifftotext=%s" % (urlquote(title), found['section_num'], urlquote(found['section_text']))
+
+    ret = web_post(diff_params)
+    diff = ret['query']['pages'].values()[0]['revisions'][0]['diff']['*']
+    return (diff, found['replacement'])
 
 def get_page(title, q, linkto=None):
     content, timestamp = get_content_and_timestamp(title)
