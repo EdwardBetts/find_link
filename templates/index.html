@@ -56,7 +56,7 @@ table.diff td div{ word-wrap:break-word; overflow:auto}
   <span class="flash">{{ message }}</span><br>
 {% endif %}
 <form class="well form-search" action="{{url_for('index')}}">
-<input name="q" value="{{ q }}" class="input-medium search-query">
+<input name="q" value="{{ q }}" size="60" class="input-medium search-query">
 <button type="submit" class="btn">Search</button>
 {% if q %}
     {% set esc_q = urlquote(q.replace(' ', '_')) %}

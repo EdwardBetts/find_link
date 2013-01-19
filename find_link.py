@@ -1,9 +1,14 @@
 # coding=utf-8
-from flask import Flask, render_template, request, Markup, redirect, url_for
+import urllib
+import json
+import re
+import os
+import sys
 from time import time
 from datetime import datetime
 from pprint import pprint
-import urllib, json, re, os, sys
+
+from flask import Flask, render_template, request, Markup, redirect, url_for
 
 app = Flask(__name__)
 last_slash = __file__.rfind('/')
@@ -28,17 +33,20 @@ cat_start_params = 'list=allpages&apnamespace=14&apfilterredir=nonredirects&apli
 save_to_cache = False
 
 def commify(amount):
+    "return a number with commas, use for word count"
     return '{:,}'.format(int(amount))
 
 def test_commify():
+    "test commify"
     assert commify(1) == '1'
     assert commify(2222) == '2,222'
     assert commify('3333') == '3,333'
 
 re_space_or_dash = re.compile('[ -]')
-
 def is_title_case(phrase):
-    return all(term[0].isupper() and term[1:].islower() for term in re_space_or_dash.split(phrase))
+    
+    return all(term[0].isupper() and term[1:].islower() 
+               for term in re_space_or_dash.split(phrase))
 
 def test_is_title_case():
     assert is_title_case('Test')
@@ -53,10 +61,12 @@ class AppURLopener(urllib.FancyURLopener):
 
 urllib._urlopener = AppURLopener()
 
-def urlquote(s):
-    return urllib.quote_plus(s.encode('utf-8'))
+def urlquote(value):
+    '''prepare string for use in URL param'''
+    return urllib.quote_plus(value.encode('utf-8'))
 
 def test_urlquote():
+    '''test urlquote'''
     assert urlquote('test') == 'test'
     assert urlquote('test test') == 'test+test'
     assert urlquote(u'na\xefve') == 'na%C3%AFve'
@@ -75,6 +85,7 @@ def web_get(params):
         raise
 
 def web_post(params):
+    '''POST to Wikipedia API'''
     data = urllib.urlopen('https://en.wikipedia.org/w/api.php', 'format=json&action=query&' + params).read()
     if save_to_cache:
         out = open('cache/' + str(time()), 'w')
@@ -364,11 +375,39 @@ def test_find_link_in_content():
     q = 'two-factor authentication'
     sample = "Two factor authentication is a 'strong authentication' method as it"
 
-    #for func in find_link_in_content, find_link_in_text:
-    for func in [find_link_in_text]:
+    for func in find_link_in_content, find_link_in_text:
         (c, r) = func(q, sample)
         assert c == "[[Two-factor authentication]] is a 'strong authentication' method as it"
         assert r == q[0].upper() + q[1:]
+
+    if False:
+        q = 'post-World War II baby boom'
+        sample = 'huge boost during the post World War II [[Baby Boomer|Baby Boom]].'
+        #for func in find_link_in_content, find_link_in_text:
+        for func in [find_link_in_text]:
+            (c, r) = func(q, sample)
+            assert c == 'huge boost during the [[post-World War II baby boom]]er.'
+            assert r == q
+
+    q = 'existence of God'
+    sample = 'with "je pense donc je suis" or "[[cogito ergo sum]]" or "I think, therefore I am", argued that "the self" is something that we can know exists with [[epistemology|epistemological]] certainty. Descartes argued further that this knowledge could lead to a proof of the certainty of the existence of [[God]], using the [[ontological argument]] that had been formulated first by [[Anselm of Canterbury]].{{Citation needed|date=January 2012}}'
+    for func in find_link_in_content, find_link_in_text:
+        (c, r) = func(q, sample)
+        assert c == sample.replace('existence of [[God', '[[existence of God')
+        assert r == q
+
+    q = 'existence of God'
+    sample = '[[Intelligent design]] is an [[Teleological argument|argument for the existence of God]],'
+    for func in find_link_in_content, find_link_in_text:
+        with py.test.raises(NoMatch):
+            func(q, sample)
+
+    q = 'correlation does not imply causation'
+    sample = 'Indeed, an important axiom that social scientists cite, but often forget, is that "[[correlation]] does not imply [[Causality|causation]]."'
+    for func in find_link_in_content, find_link_in_text:
+        (c, r) = func(q, sample)
+        assert c == 'Indeed, an important axiom that social scientists cite, but often forget, is that "[[correlation does not imply causation]]."'
+        assert r == q
 
     pseudocode1 = 'These languages are typically [[Dynamic typing|dynamically typed]], meaning that variable declarations and other [[Boilerplate_(text)#Boilerplate_code|boilerplate code]] can be omitted.'
 
@@ -383,17 +422,18 @@ def test_find_link_in_content():
         assert c == pseudocode2.replace('(text)#Boilerplate code|boilerplate]] code', 'code]]')
         assert r == 'boilerplate code'
 
-    yard = "primary [[Hump yard|hump classification yards]] are located in Allentown."
-    for func in find_link_in_content, find_link_in_text:
-        (c, r) = func('classification yard', yard)
-        assert c == yard.replace('[[Hump yard|hump classification yards]]', 'hump [[classification yard]]s')
-        assert r == 'classification yard'
+    if False:
+        yard = "primary [[Hump yard|hump classification yards]] are located in Allentown."
+        for func in find_link_in_content, find_link_in_text:
+            (c, r) = func('classification yard', yard)
+            assert c == yard.replace('[[Hump yard|hump classification yards]]', 'hump [[classification yard]]s')
+            assert r == 'classification yard'
 
-    yard2 = 'A major [[hump yard|railway classification yard]] is north of Blenheim at [[Spring Creek, New Zealand|Spring Creek]].'
-    for func in find_link_in_content, find_link_in_text:
-        (c, r) = func('classification yard', yard2)
-        assert c == yard2.replace('[[hump yard|railway classification yard]]', 'railway [[classification yard]]')
-        assert r == 'classification yard'
+        yard2 = 'A major [[hump yard|railway classification yard]] is north of Blenheim at [[Spring Creek, New Zealand|Spring Creek]].'
+        for func in find_link_in_content, find_link_in_text:
+            (c, r) = func('classification yard', yard2)
+            assert c == yard2.replace('[[hump yard|railway classification yard]]', 'railway [[classification yard]]')
+            assert r == 'classification yard'
 
     yard3 = 'Five houses were destroyed and three others were damaged. A high school was also heavily damaged and railroad cars were thrown in a small freight classification yard. Four people were injured.'
     for func in find_link_in_content, find_link_in_text:
@@ -446,7 +486,7 @@ def test_find_link_in_content():
 class NoMatch(Exception):
     pass
 
-re_heading = re.compile(r'^\s*(=+)\s*(.+)\s*\1\s*$')
+re_heading = re.compile(r'^\s*(=+)\s*(.+)\s*\1(<!--.*-->|\s)*$')
 def section_iter(text):
     cur_section = ''
     heading = None
@@ -471,13 +511,49 @@ Paragraph 1.
 ==Heading 2 ==
 Paragraph 2.
 '''
-    assert list(section_iter(text)) == [('==Heading 1 ==\n', 'Paragraph 1.\n'), ('==Heading 2 ==\n', 'Paragraph 2.\n')]
+    assert list(section_iter(text)) == [
+        ('==Heading 1 ==\n', 'Paragraph 1.\n'),
+        ('==Heading 2 ==\n', 'Paragraph 2.\n')
+    ]
+
+def get_subsetions(text, section_num):
+    found = ''
+    collection_level = None
+    for num, (heading, body) in enumerate(section_iter(text)):
+        if heading is None:
+            level = 0
+        else:
+            m = re_heading.match(heading)
+            level = len(m.group(1))
+        if num == section_num:
+            collection_level = level
+            continue
+        if collection_level:
+            if level > collection_level:
+                found += heading+body
+            else:
+                break
+    return found
+
+def test_get_subsections():
+    text = '''==Heading 1 ==
+Paragraph 1.
+==Heading 2 ==
+Paragraph 2.
+===Level 2===
+Paragraph 3.
+==Heading 4==
+Paragraph 4.
+'''
+    assert get_subsetions(text, 4) == ''
+
+    assert get_subsetions(text, 4) == ''
 
 en_dash = u'\u2013'
 trans = { ',': ',?', ' ': ' *[-\n]? *' }
 trans[en_dash] = trans[' ']
 
-trans2 = { ' ': r"('?s?\]\])?'?s? ?(\[\[)?", '-': '[- ]' }
+trans2 = { ' ': r"('?s?\]\])?'?s? ?(\[\[(?:.+\|)?)?", '-': '[- ]' }
 trans2[en_dash] = trans2[' ']
 
 patterns = [
@@ -545,11 +621,10 @@ def find_link_in_text(q, content):
     re_links = [p(q) for p in patterns]
 
     match_in_non_link = False
+    bad_link_match = False
     for token_type, text in parse_links(content):
-        print (token_type, text)
         if token_type == 'text':
             for re_link in re_links:
-                print re_link.pattern
                 m = re_link.search(text)
                 if m:
                     match_in_non_link = True
@@ -572,13 +647,21 @@ def find_link_in_text(q, content):
             for re_link in re_links:
                 m = re_link.search(link_text)
                 if m and not match_in_non_link:
+                    lc_alpha = lambda s: ''.join(c.lower() for c in s if c.isalpha())
+                    if link_dest and lc_alpha(q) not in lc_alpha(link_dest):
+                        bad_link_match = True
+                        continue
+                    else:
+                        bad_link_match = False
+
                     replacement = match_found(m, q, None)
                     text = re_link.sub(lambda m: "[[%s]]" % replacement, link_text, count=1)
                     break
         new_content += text
     if replacement:
         return (new_content, replacement)
-
+    if bad_link_match:
+        raise NoMatch
     for re_link in re_links:
         m = re_link.search(content)
         if m:
@@ -597,6 +680,7 @@ def find_link_in_content(q, content, linkto=None):
     re_links = [p(q) for p in patterns]
     replacement = None
     new_content = ''
+    bad_link_match = False
     for header, section_text in sections:
         if header:
             new_content += header 
@@ -612,18 +696,25 @@ def find_link_in_content(q, content, linkto=None):
                                 match_in_non_link = True
                     if token_type2 == 'link' and not replacement:
                         link_text = text2[2:-2]
+                        link_dest = None
                         if '|' in link_text:
                             link_dest, link_text = link_text.split('|', 1)
                         for re_link in re_links:
                             m = re_link.search(link_text)
                             if m and not match_in_non_link:
+                                lc_alpha = lambda s: ''.join(c.lower() for c in s if c.isalpha())
+                                if link_dest and lc_alpha(q) not in lc_alpha(link_dest):
+                                    bad_link_match = True
+                                    continue
+                                else:
+                                    bad_link_match = False
                                 replacement = match_found(m, q, None)
                                 text2 = re_link.sub(lambda m: "[[%s]]" % replacement, link_text, count=1)
                                 break
                     new_text += text2
                 if replacement:
                     text = new_text
-                else:
+                elif not bad_link_match:
                     for re_link in re_links:
                         m = re_link.search(text)
                         if m:
@@ -678,7 +769,7 @@ def find_link_and_section(q, content, linkto=None):
         if replacement:
             return {
                 'section_num': section_num,
-                'section_text': new_content.strip(),
+                'section_text': new_content,
                 'replacement': replacement,
             }
     raise NoMatch
@@ -701,6 +792,19 @@ def get_case_from_content(title):
     if start != -1:
         return content[start+3:start+3+len(title)]
 
+def get_diff(q, title, linkto):
+    content, timestamp = get_content_and_timestamp(title)
+    found = find_link_and_section(q, content, linkto)
+
+    section_text = found['section_text'] + get_subsetions(content,
+                                                          found['section_num'])
+
+    diff_params = "prop=revisions&rvprop=timestamp&titles=%s&rvsection=%d&rvdifftotext=%s" % (urlquote(title), found['section_num'], urlquote(section_text.strip()))
+
+    ret = web_post(diff_params)
+    diff = ret['query']['pages'].values()[0]['revisions'][0]['diff']['*']
+    return (diff, found['replacement'])
+
 @app.route('/diff')
 def diff_view():
     q = request.args.get('q')
@@ -708,9 +812,9 @@ def diff_view():
     linkto = request.args.get('linkto')
 
     try:
-        diff = get_diff(q, title, linkto)
+        diff, replacement = get_diff(q, title, linkto)
     except NoMatch:
-        return None
+        return "can't generate diff"
 
     return '<table>' + diff + '</table>'
 
@@ -720,16 +824,6 @@ def get_content_and_timestamp(title):
     content = rev['*']
     timestamp = rev['timestamp']
     return (content, timestamp)
-
-def get_diff(q, title, linkto):
-    content, timestamp = get_content_and_timestamp(title)
-    found = find_link_and_section(q, content, linkto)
-
-    diff_params = "prop=revisions&rvprop=timestamp&titles=%s&rvsection=%d&rvdifftotext=%s" % (urlquote(title), found['section_num'], urlquote(found['section_text']))
-
-    ret = web_post(diff_params)
-    diff = ret['query']['pages'].values()[0]['revisions'][0]['diff']['*']
-    return (diff, found['replacement'])
 
 def get_page(title, q, linkto=None):
     content, timestamp = get_content_and_timestamp(title)
@@ -741,10 +835,8 @@ def get_page(title, q, linkto=None):
         return None
 
     diff_url = "prop=revisions&rvprop=timestamp&titles=%s&rvdifftotext=%s" % (urlquote(title), urlquote(content))
-    #pprint(web_post(diff_url), stream=open('wikidiff', 'w'))
 
     summary = "link [[%s]] using [[User:Edward/Find link|Find link]]" % replacement
-    #text = "title: %s\nq: %s\nsummary: %s\ntimestamp: %s\n\n%s" % (title, q, timestamp, summary, content)
 
     start_time = datetime.now().strftime("%Y%m%d%H%M%S")
     return render_template('find_link.html',
@@ -868,6 +960,7 @@ def findlink(q, title=None, message=None):
         results = ret['results'],
         urlquote = urlquote,
         commify = commify,
+        str = str,
         enumerate = enumerate,
         longer_titles = ret['longer'],
         redirect_to = redirect_to,
