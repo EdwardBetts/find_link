@@ -2,8 +2,6 @@
 import urllib
 import json
 import re
-import os
-import sys
 from time import time
 from datetime import datetime
 from pprint import pprint
@@ -11,24 +9,21 @@ from pprint import pprint
 from flask import Flask, render_template, request, Markup, redirect, url_for
 
 app = Flask(__name__)
-last_slash = __file__.rfind('/')
-key = open(__file__[:last_slash+1] + 'key').read()
-if key[-1] == '\n':
-    key = key[:-1]
-Flask.secret_key = key
+app.config.from_pyfile('config')
+
 query_url = 'https://en.wikipedia.org/w/api.php?format=json&action=query&'
 #srprop = 'size|wordcount|timestamp|score|snippet|titlesnippet|sectionsnippet|sectiontitle|redirectsnippet|redirecttitle|hasrelated'
-search_params = 'list=search&srwhat=text&srlimit=50&srsearch='
-new_page_params = 'list=recentchanges&rclimit=50&rctype=new&rcnamespace=0&rcshow=!redirect'
-backlink_params = 'list=backlinks&bllimit=500&blnamespace=0&bltitle='
-redirect_params = 'list=backlinks&blfilterredir=redirects&bllimit=500&blnamespace=0&bltitle='
-content_params = 'prop=revisions|info&rvprop=content|timestamp&titles='
-link_params = 'prop=links&pllimit=500&plnamespace=0&titles='
-templates_params = 'prop=templates&tllimit=500&tlnamespace=10&titles='
-allpages_params = 'list=allpages&apnamespace=0&apfilterredir=nonredirects&aplimit=500&apprefix='
-info_params = 'action=query&prop=info&redirects&titles='
-categorymembers_params = 'action=query&list=categorymembers&cmnamespace=0&cmlimit=500&cmtitle='
-cat_start_params = 'list=allpages&apnamespace=14&apfilterredir=nonredirects&aplimit=500&apprefix='
+search_params          = 'list=search' '&srwhat=text' '&srlimit=50&srsearch='
+new_page_params        = 'list=recentchanges' '&rclimit=50' '&rctype=new' '&rcnamespace=0' '&rcshow=!redirect'
+backlink_params        = 'list=backlinks' '&bllimit=500' '&blnamespace=0' '&bltitle='
+redirect_params        = 'list=backlinks' '&blfilterredir=redirects' '&bllimit=500' '&blnamespace=0' '&bltitle='
+content_params         = 'prop=revisions|info' '&rvprop=content|timestamp' '&titles='
+link_params            = 'prop=links' '&pllimit=500' '&plnamespace=0' '&titles='
+templates_params       = 'prop=templates' '&tllimit=500' '&tlnamespace=10' '&titles='
+allpages_params        = 'list=allpages' '&apnamespace=0' '&apfilterredir=nonredirects' '&aplimit=500' '&apprefix='
+info_params            = 'action=query' '&prop=info' '&redirects' '&titles='
+categorymembers_params = 'action=query' '&list=categorymembers' '&cmnamespace=0' '&cmlimit=500' '&cmtitle='
+cat_start_params       = 'list=allpages' '&apnamespace=14' '&apfilterredir=nonredirects' '&aplimit=500' '&apprefix='
 
 save_to_cache = False
 
@@ -44,7 +39,6 @@ def test_commify():
 
 re_space_or_dash = re.compile('[ -]')
 def is_title_case(phrase):
-    
     return all(term[0].isupper() and term[1:].islower() 
                for term in re_space_or_dash.split(phrase))
 
@@ -83,6 +77,7 @@ def web_get(params):
     except ValueError:
         print data
         raise
+orig_web_get = web_get
 
 def web_post(params):
     '''POST to Wikipedia API'''
@@ -264,16 +259,23 @@ def wiki_backlink(q):
 def test_en_dash():
     title = u'obsessive\u2013compulsive disorder'
     content = 'This is a obsessive-compulsive disorder test'
-    for func in find_link_in_content, find_link_in_text:
-        (c, r) = func(title, content)
-        assert r == title
-        assert c == u'This is a [[obsessive\u2013compulsive disorder]] test'
+    (c, r) = find_link_in_content(title, content)
+    assert r == title
+    assert c == u'This is a [[obsessive\u2013compulsive disorder]] test'
+
+    (c, r) = find_link_in_text(title, content)
+    assert r == title
+    assert c == u'This is a [[obsessive\u2013compulsive disorder]] test'
 
     content = 'This is a [[obsessive-compulsive]] disorder test'
-    for func in find_link_in_content, find_link_in_text:
-        (c, r) = func(title, content)
-        assert r == title
-        assert c == u'This is a [[obsessive\u2013compulsive disorder]] test'
+
+    (c, r) = find_link_in_content(title, content)
+    assert r == title
+    assert c == u'This is a [[obsessive\u2013compulsive disorder]] test'
+
+    (c, r) = find_link_in_text(title, content)
+    assert r == title
+    assert c == u'This is a [[obsessive\u2013compulsive disorder]] test'
 
 def test_avoid_link_in_heading():
     tp = 'test phrase'
@@ -324,6 +326,7 @@ def test_avoid_link_in_cite():
 
 def test_find_link_in_content():
     get_case_from_content = lambda s: None
+    global web_get
     import py.test
     with py.test.raises(NoMatch):
         find_link_in_content('foo', 'bar')
@@ -389,6 +392,7 @@ def test_find_link_in_content():
             assert c == 'huge boost during the [[post-World War II baby boom]]er.'
             assert r == q
 
+    web_get = orig_web_get
     q = 'existence of God'
     sample = 'with "je pense donc je suis" or "[[cogito ergo sum]]" or "I think, therefore I am", argued that "the self" is something that we can know exists with [[epistemology|epistemological]] certainty. Descartes argued further that this knowledge could lead to a proof of the certainty of the existence of [[God]], using the [[ontological argument]] that had been formulated first by [[Anselm of Canterbury]].{{Citation needed|date=January 2012}}'
     for func in find_link_in_content, find_link_in_text:
@@ -416,11 +420,17 @@ def test_find_link_in_content():
         assert c == pseudocode1.replace('Boilerplate_(text)#Boilerplate_code|', '')
         assert r == 'boilerplate code'
 
-    pseudocode2 = 'Large amounts of [[boilerplate (text)#Boilerplate code|boilerplate]] code, such as manual definitions of type casting macros and obscure type registration incantations, are necessary to create a new class.'
+    pseudocode2 = 'Large amounts of [[boilerplate (text)#Boilerplate code|boilerplate]] code.'
     for func in find_link_in_content, find_link_in_text:
         (c, r) = func('boilerplate code', pseudocode2)
         assert c == pseudocode2.replace('(text)#Boilerplate code|boilerplate]] code', 'code]]')
         assert r == 'boilerplate code'
+
+    sample = 'units formed with [[SI prefix|metric prefixes]], such as kiloseconds'
+    find_link_in_content('metric prefix', sample)
+
+    sample = u"==Geography==\nA gem of Bermuda's coastline, it is surrounded by [[St. George's Parish, Bermuda|St. George's Parish]] in the north, east, south (Tucker's Town), and [[Hamilton Parish, Bermuda|Hamilton Parish]] in the west. A chain of islands and rocks stretches across the main opening to the [[Atlantic Ocean]], in the east, notably [[Cooper's Island, Bermuda|Cooper's Island]] (which was made a landmass contiguous to St. David's Island and Longbird Island in the 1940s), and [[Nonsuch Island, Bermuda|Nonsuch Island]]. The only channel suitable for large vessels to enter the harbour from the open Atlantic is [[Castle Roads, Bermuda|Castle Roads]], which was historically guarded by a number of fortifications, on [[Castle Island, Bermuda|Castle Island]], Brangman's Island, and Goat Island. Forts were also placed nearby on other small islands, and on the Tucker's Town peninsula of the Main Island. In the west, [[The Causeway, Bermuda|The Causeway]] crosses from the main island to St. David's Island, and beyond this a stretch of water known as [[Ferry Reach, Bermuda|Ferry Reach]] connects the harbour with [[St. George's Harbor, Bermuda|St. George's Harbour]] to the north, where Bermuda's first permanent settlement, [[St. George's, Bermuda|St. George's Town]], was founded in 1612. An unincorporated settlement, [[Tucker's Town, Bermuda|Tucker's Town]], was established on the [[peninsula]] of the [[Main Island, Bermuda|Main Island]] at the south-west of the harbour. The settlement was cleared by compulsory purchase order in the 1920s in order to create a luxury enclave where homes could be purchased by wealthy foreigners, and the attendant Mid Ocean Golf Club. In [[Hamilton Parish, Bermuda|Hamilton Parish]], on the western shore of the harbour, lies [[Walsingham Bay, Bermuda|Walsingham Bay]], the site where, in 1609-10, the crew of the wrecked [[Sea Venture]] built the ''[[Patience]]'', one of two ships built, which carried most of the survivors of the wrecking to [[Jamestown, Virginia|Jamestown]], [[Virginia]], in 1610. The ''Patience'' returned to Bermuda with [[George Somers|Admiral Sir George Somers]], who died in Bermuda later that year."
+    find_link_in_content('compulsory purchase order', sample)
 
     if False:
         yard = "primary [[Hump yard|hump classification yards]] are located in Allentown."
@@ -443,6 +453,13 @@ def test_find_link_in_content():
 
     #yard2 = 'For the section from [[Rotterdam]] to the large [[Kijfhoek (classification yard)|classification yard Kijfhoek]] existing track was reconstructed, but three quarters of the line is new, from Kijfhoek to [[Zevenaar]] near the German border.'
     #(c, r) = find_link_in_text('classification yard', yard2)
+
+    if False:
+        sample = 'GEHA also has a contract with the federal government to administer benefits for the [[Pre-existing Condition Insurance Plan]], which will be a transitional program until 2014.'
+        q = 'pre-existing condition'
+        for func in find_link_in_content, find_link_in_text:
+            with py.test.raises(NoMatch):
+                func(q, sample)
 
     station = 'Ticket barriers control access to all platforms, although the bridge entrance has no barriers.'
     (c, r) = find_link_in_content('ticket barriers', station, linkto='turnstile')
@@ -470,7 +487,6 @@ def test_find_link_in_content():
             assert c == 'Able to find this [[test phrase]] in an article.'
             assert r == 'test phrase'
 
-    global web_get
     title = 'London congestion charge'
     web_get = lambda params: {
         'query': { 'pages': { 1: { 'revisions': [{
@@ -614,60 +630,61 @@ def find_link_in_text_old(q, text):
             return (text, replacement)
     raise NoMatch
 
+def mk_link_matcher(q):
+    re_links = [p(q) for p in patterns]
+    def search_for_link(text):
+        for re_link in re_links:
+            m = re_link.search(text)
+            if m:
+                return m
+
+    return search_for_link
+
+def add_link(m, replacement, text):
+    return m.re.sub(lambda m: "[[%s]]" % replacement, text, count=1)
+
 def find_link_in_text(q, content): 
     new_content = ''
     replacement = None
 
-    re_links = [p(q) for p in patterns]
+    search_for_link = mk_link_matcher(q)
 
     match_in_non_link = False
     bad_link_match = False
     for token_type, text in parse_links(content):
         if token_type == 'text':
-            for re_link in re_links:
-                m = re_link.search(text)
-                if m:
-                    match_in_non_link = True
+            if search_for_link(text):
+                match_in_non_link = True
         elif token_type == 'image':
-            last_pipe = text.rfind('|')
-            link_text = text[last_pipe+1:-2]
-            for re_link in re_links:
-                m = re_link.search(link_text)
-                if m:
-                    replacement = match_found(m, q, None)
-                    text = text[:last_pipe+1] + \
-                        re_link.sub(lambda m: "[[%s]]" % replacement, link_text, count=1) + ']]'
-                    break
-
-        elif token_type == 'link':
+            before, sep, link_text = text[:-2].rpartition('|')
+            m = search_for_link(link_text)
+            if m:
+                replacement = match_found(m, q, None)
+                text = before + sep + add_link(m, replacement, link_text) + ']]'
+        elif token_type == 'link' and not match_in_non_link:
             link_text = text[2:-2]
             link_dest = None
             if '|' in link_text:
                 link_dest, link_text = link_text.split('|', 1)
-            for re_link in re_links:
-                m = re_link.search(link_text)
-                if m and not match_in_non_link:
-                    lc_alpha = lambda s: ''.join(c.lower() for c in s if c.isalpha())
-                    if link_dest and lc_alpha(q) not in lc_alpha(link_dest):
-                        bad_link_match = True
-                        continue
-                    else:
-                        bad_link_match = False
-
+            m = search_for_link(link_text)
+            if m:
+                lc_alpha = lambda s: ''.join(c.lower() for c in s if c.isalpha())
+                if link_dest and lc_alpha(q) not in lc_alpha(link_dest):
+                    bad_link_match = True
+                else:
+                    bad_link_match = False
                     replacement = match_found(m, q, None)
-                    text = re_link.sub(lambda m: "[[%s]]" % replacement, link_text, count=1)
-                    break
+                    text = add_link(m, replacement, link_text)
         new_content += text
     if replacement:
         return (new_content, replacement)
     if bad_link_match:
         raise NoMatch
-    for re_link in re_links:
-        m = re_link.search(content)
-        if m:
-            replacement = match_found(m, q, None)
-            content = re_link.sub(lambda m: "[[%s]]" % replacement, content, count=1)
-            return (content, replacement)
+    m = search_for_link(content)
+    if m:
+        replacement = match_found(m, q, None)
+        content = add_link(m, replacement, content)
+        return (content, replacement)
     raise NoMatch
 
 def find_link_in_content(q, content, linkto=None):
@@ -677,7 +694,7 @@ def find_link_in_content(q, content, linkto=None):
         except NoMatch:
             pass
     sections = list(section_iter(content))
-    re_links = [p(q) for p in patterns]
+    search_for_link = mk_link_matcher(q)
     replacement = None
     new_content = ''
     bad_link_match = False
@@ -690,37 +707,34 @@ def find_link_in_content(q, content, linkto=None):
                 match_in_non_link = False
                 for token_type2, text2 in parse_links(text):
                     if token_type2 == 'text':
-                        for re_link in re_links:
-                            m = re_link.search(text2)
-                            if m:
-                                match_in_non_link = True
-                    if token_type2 == 'link' and not replacement:
+                        m = search_for_link(text2)
+                        if m:
+                            match_in_non_link = True
+                    if token_type2 == 'link' and not replacement and not match_in_non_link:
                         link_text = text2[2:-2]
                         link_dest = None
                         if '|' in link_text:
                             link_dest, link_text = link_text.split('|', 1)
-                        for re_link in re_links:
-                            m = re_link.search(link_text)
-                            if m and not match_in_non_link:
-                                lc_alpha = lambda s: ''.join(c.lower() for c in s if c.isalpha())
-                                if link_dest and lc_alpha(q) not in lc_alpha(link_dest):
-                                    bad_link_match = True
-                                    continue
-                                else:
+                        m = search_for_link(link_text)
+                        if m:
+                            lc_alpha = lambda s: ''.join(c.lower() for c in s if c.isalpha())
+                            lc_alpha_q = lc_alpha(q)
+                            bad_link_match = link_dest and (lc_alpha_q not in lc_alpha(link_dest))
+                            if bad_link_match and link_dest:
+                                link_dest_redirect = get_wiki_info(link_dest)
+                                if link_dest_redirect and lc_alpha(link_dest_redirect) == lc_alpha_q:
                                     bad_link_match = False
+                            if not bad_link_match:
                                 replacement = match_found(m, q, None)
-                                text2 = re_link.sub(lambda m: "[[%s]]" % replacement, link_text, count=1)
-                                break
+                                text2 = add_link(m, replacement, link_text)
                     new_text += text2
                 if replacement:
                     text = new_text
                 elif not bad_link_match:
-                    for re_link in re_links:
-                        m = re_link.search(text)
-                        if m:
-                            replacement = match_found(m, q, linkto)
-                            text = re_link.sub(lambda m: "[[%s]]" % replacement, text, count=1)
-                            break
+                    m = search_for_link(text)
+                    if m:
+                        replacement = match_found(m, q, linkto)
+                        text = add_link(m, replacement, text)
             new_content += text
     if replacement:
         return (new_content, replacement)
@@ -735,7 +749,9 @@ def find_link_and_section(q, content, linkto=None):
     sections = list(section_iter(content))
     replacement = None
 
-    re_links = [p(q) for p in patterns]
+    search_for_link = mk_link_matcher(q)
+
+    found = {}
 
     for section_num, (header, section_text) in enumerate(sections):
         new_content = ''
@@ -749,29 +765,29 @@ def find_link_and_section(q, content, linkto=None):
                         link_text = text2[2:-2]
                         if '|' in link_text:
                             link_dest, link_text = link_text.split('|', 1)
-                        for re_link in re_links:
-                            m = re_link.search(link_text)
-                            if m:
-                                replacement = match_found(m, q, None)
-                                text2 = re_link.sub(lambda m: "[[%s]]" % replacement, link_text, count=1)
-                                break
+                        m = search_for_link(link_text)
+                        if m:
+                            found['link_dest'] = link_dest
+                            found['link_text'] = link_text
+                            replacement = match_found(m, q, None)
+                            text2 = add_link(m, replacement, link_text)
                     new_text += text2
                 if replacement:
                     text = new_text
                 else:
-                    for re_link in re_links:
-                        m = re_link.search(text)
-                        if m:
-                            replacement = match_found(m, q, linkto)
-                            text = re_link.sub(lambda m: "[[%s]]" % replacement, text, count=1)
-                            break
+                    m = search_for_link(text)
+                    if m:
+                        replacement = match_found(m, q, linkto)
+                        text = add_link(m, replacement, text)
             new_content += text
         if replacement:
-            return {
+            found.update({
                 'section_num': section_num,
                 'section_text': new_content,
+                'old_text': (header or '') + section_text,
                 'replacement': replacement,
-            }
+            })
+            return found
     raise NoMatch
 
 def test_get_case_from_content(): # test is broken
