@@ -150,6 +150,7 @@ def test_get_wiki_info():
     except Missing:
         is_missing = True
     assert is_missing
+    web_get = orig_web_get
 
 def cat_start(q):
     ret = web_get(cat_start_params + urlquote(q))
@@ -159,6 +160,7 @@ def test_cat_start():
     global web_get
     web_get = lambda params: {"query":{"allpages":[]}}
     assert cat_start('test123') == []
+    web_get = orig_web_get
 
 def all_pages(q):
     ret = web_get(allpages_params + urlquote(q))
@@ -168,6 +170,7 @@ def test_all_pages():
     global web_get
     web_get = lambda params: {"query":{"allpages":[{"pageid":312605,"ns":0,"title":"Government budget deficit"}]}}
     assert all_pages('Government budget deficit') == []
+    web_get = orig_web_get
 
 def categorymembers(q):
     ret = web_get(categorymembers_params + urlquote(q[0].upper()) + urlquote(q[1:]))
@@ -177,6 +180,7 @@ def test_categorymembers():
     global web_get
     web_get = lambda params: {"query":{"categorymembers":[]}}
     assert categorymembers('test123') == []
+    web_get = orig_web_get
 
 def page_links(titles):
     titles = list(titles)
@@ -245,6 +249,7 @@ def wiki_redirects(q): # pages that link here
 def wiki_backlink(q):
     ret = web_get(backlink_params + urlquote(q))
     if 'query' not in ret:
+        print 'backlink'
         pprint(ret)
     docs = ret['query']['backlinks']
     while 'query-continue' in ret:
@@ -392,7 +397,6 @@ def test_find_link_in_content():
             assert c == 'huge boost during the [[post-World War II baby boom]]er.'
             assert r == q
 
-    web_get = orig_web_get
     q = 'existence of God'
     sample = 'with "je pense donc je suis" or "[[cogito ergo sum]]" or "I think, therefore I am", argued that "the self" is something that we can know exists with [[epistemology|epistemological]] certainty. Descartes argued further that this knowledge could lead to a proof of the certainty of the existence of [[God]], using the [[ontological argument]] that had been formulated first by [[Anselm of Canterbury]].{{Citation needed|date=January 2012}}'
     for func in find_link_in_content, find_link_in_text:
@@ -498,6 +502,7 @@ def test_find_link_in_content():
     for func in find_link_in_content, find_link_in_text:
         (c, r) = func('London congestion charge', article)
         assert r == 'London congestion charge'
+    web_get = orig_web_get
 
 class NoMatch(Exception):
     pass
@@ -799,6 +804,7 @@ def test_get_case_from_content(): # test is broken
             }]}}
     }}
     assert get_case_from_content(title) == title
+    web_get = orig_web_get
 
 def get_case_from_content(title):
     ret = web_get(content_params + urlquote(title))
@@ -948,6 +954,8 @@ def do_search(q, redirect_to):
 
 @app.route("/<path:q>")
 def findlink(q, title=None, message=None):
+    if '%' in q: # double encoding
+        q = urllib.unquote(q)
     q_trim = q.strip('_')
     if not message and (' ' in q or q != q_trim):
         return redirect(url_for('findlink', q=q.replace(' ', '_').strip('_'), message=message))
