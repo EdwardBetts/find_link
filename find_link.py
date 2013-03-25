@@ -719,7 +719,7 @@ def find_link_in_content(q, content, linkto=None):
                         if m:
                             lc_alpha = lambda s: ''.join(c.lower() for c in s if c.isalpha())
                             lc_alpha_q = lc_alpha(q)
-                            bad_link_match = link_dest and (lc_alpha_q not in lc_alpha(link_dest))
+                            bad_link_match = link_dest and len(link_dest) > len(q) and (lc_alpha_q not in lc_alpha(link_dest))
                             if bad_link_match and link_dest:
                                 link_dest_redirect = get_wiki_info(link_dest)
                                 if link_dest_redirect and lc_alpha(link_dest_redirect) == lc_alpha_q:
@@ -1002,6 +1002,8 @@ def wiki_space_norm(s):
 def index():
     title = request.args.get('title')
     q = request.args.get('q')
+    if '%' in q: # handle double encoding
+        q = urllib.unqote(q)
     linkto = request.args.get('linkto')
     if title and q:
         q = wiki_space_norm(q)
