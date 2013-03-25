@@ -51,7 +51,7 @@ def test_is_title_case():
     assert not is_title_case('tEst Test')
 
 class AppURLopener(urllib.FancyURLopener):
-    version = "find-link/2.0 (contact: edwardbetts@gmail.com)"
+    version = "find-link/2.0 (contact: edward@4angle.com)"
 
 urllib._urlopener = AppURLopener()
 
