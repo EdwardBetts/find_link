@@ -957,7 +957,7 @@ def do_search(q, redirect_to):
 
 @app.route("/<path:q>")
 def findlink(q, title=None, message=None):
-    if '%' in q: # double encoding
+    if q and '%' in q: # double encoding
         q = urllib.unquote(q)
     q_trim = q.strip('_')
     if not message and (' ' in q or q != q_trim):
@@ -1013,8 +1013,6 @@ def wiki_space_norm(s):
 def index():
     title = request.args.get('title')
     q = request.args.get('q')
-    if '%' in q: # handle double encoding
-        q = urllib.unqote(q)
     linkto = request.args.get('linkto')
     if title and q:
         q = wiki_space_norm(q)
