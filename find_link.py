@@ -28,27 +28,38 @@ cat_start_params       = 'list=allpages' '&apnamespace=14' '&apfilterredir=nonre
 save_to_cache = False
 
 def commify(amount):
-    "return a number with commas, use for word count"
-    return '{:,}'.format(int(amount))
+    '''return a number with commas, use for word count
 
-def test_commify():
-    "test commify"
-    assert commify(1) == '1'
-    assert commify(2222) == '2,222'
-    assert commify('3333') == '3,333'
+    >>> commify(1)
+    '1'
+    >>> commify(2222)
+    '2,222'
+    >>> commify('3333')
+    '3,333'
+    '''
+    return '{:,}'.format(int(amount))
 
 re_space_or_dash = re.compile('[ -]')
 def is_title_case(phrase):
+    '''
+    Detected if a given phrase is in Title Case.
+
+    >>> is_title_case('Test')
+    True
+    >>> is_title_case('Test Test')
+    True
+    >>> is_title_case('test')
+    False
+    >>> is_title_case('TEST TEST')
+    False
+    >>> is_title_case('test test')
+    False
+    >>> is_title_case('tEst Test')
+    False
+    '''
+
     return all(term[0].isupper() and term[1:].islower() 
                for term in re_space_or_dash.split(phrase))
-
-def test_is_title_case():
-    assert is_title_case('Test')
-    assert is_title_case('Test Test')
-    assert not is_title_case('test')
-    assert not is_title_case('TEST TEST')
-    assert not is_title_case('test test')
-    assert not is_title_case('tEst Test')
 
 class AppURLopener(urllib.FancyURLopener):
     version = "find-link/2.0 (contact: edward@4angle.com)"
@@ -56,14 +67,17 @@ class AppURLopener(urllib.FancyURLopener):
 urllib._urlopener = AppURLopener()
 
 def urlquote(value):
-    '''prepare string for use in URL param'''
-    return urllib.quote_plus(value.encode('utf-8'))
+    '''prepare string for use in URL param
 
-def test_urlquote():
-    '''test urlquote'''
-    assert urlquote('test') == 'test'
-    assert urlquote('test test') == 'test+test'
-    assert urlquote(u'na\xefve') == 'na%C3%AFve'
+    >>> urlquote('test')
+    'test'
+    >>> urlquote('test test')
+    'test+test'
+    >>> urlquote(u'na\xefve')
+    'na%C3%AFve'
+    '''
+
+    return urllib.quote_plus(value.encode('utf-8'))
 
 def web_get(params):
     data = urllib.urlopen(query_url + params).read()
@@ -189,13 +203,21 @@ def page_links(titles):
     return dict((doc['title'], set(l['title'] for l in doc['links'])) for doc in ret['query']['pages'].itervalues() if 'links' in doc)
 
 def is_disambig(doc):
-    return any('disambig' in t or t.endswith('dis') or 'given name' in t or t == 'template:surname' for t in (t['title'].lower() for t in doc.get('templates', [])))
-
-def test_is_disambig():
-    assert not is_disambig({})
-    assert is_disambig({ 'templates': [ {'title': 'disambig'}, {'title': 'magic'}] })
-    assert is_disambig({ 'templates': [ {'title': 'geodis'}] })
-    assert is_disambig({ 'templates': [ {'title': 'Disambig'}] })
+    '''Is a this a disambiguation page?
+    >>> is_disambig({})
+    False
+    >>> is_disambig({ 'templates': [ {'title': 'disambig'}, {'title': 'magic'}] })
+    True
+    >>> is_disambig({ 'templates': [ {'title': 'geodis'}] })
+    True
+    >>> is_disambig({ 'templates': [ {'title': 'Disambig'}] })
+    True
+    '''
+    return any('disambig' in t
+                or t.endswith('dis')
+                or 'given name' in t
+                or t == 'template:surname'
+            for t in (t['title'].lower() for t in doc.get('templates', [])))
 
 def find_disambig(titles):
     titles = list(titles)
@@ -217,6 +239,17 @@ def find_disambig(titles):
 
 re_non_letter = re.compile('\W', re.U)
 def norm(s):
+    '''
+    Normalise string.
+
+    >>> norm('X') 
+    'x'
+    >>> norm('Tables')
+    'table'
+    >>> norm('Tables!!!')
+    'table'
+    '''
+
     s = re_non_letter.sub('', s).lower()
     return s[:-1] if s and s[-1] == 's' else s
 
@@ -235,11 +268,6 @@ def is_redirect_to(title_from, title_to):
     m = re_redirect.match(page_text)
     title_to = title_to[0].upper() + title_to[1:]
     return m.group(1).upper() + m.group(2) == title_to
-
-def test_norm():
-    assert norm('X') == 'x'
-    assert norm('Tables') == 'table'
-    assert norm('Tables!!!') == 'table'
 
 def wiki_redirects(q): # pages that link here
     docs = web_get(redirect_params + urlquote(q))['query']['backlinks']
@@ -380,6 +408,24 @@ def test_find_link_in_content():
         assert c == sample.replace(q, '[[' + q + ']]')
         assert r == q
 
+    q = 'fall of the Iron Curtain'
+    linkto = 'revolutions of 1989'
+    sample = 'With the fall of the [[Iron Curtain]] and the associated'
+
+    #search_for_link = mk_link_matcher(q)
+    #m = search_for_link(sample)
+    #replacement = match_found(m, q, linkto)
+    #assert replacement == 'revolutions of 1989|fall of the Iron Curtain]]'
+
+    (c, r) = find_link_in_chunk(q, sample, linkto=linkto)
+    assert c == sample.replace('fall of the [[', '[[revolutions of 1989|fall of the ')
+    assert r == 'revolutions of 1989|fall of the Iron Curtain'
+
+    q = 'religious conversion'
+    sample = 'There were no reports of [[forced religious conversion]], including of minor U.S. citizens'
+    with py.test.raises(LinkReplace):
+        find_link_in_chunk(q, sample)
+
     q = 'two-factor authentication'
     sample = "Two factor authentication is a 'strong authentication' method as it"
 
@@ -387,6 +433,14 @@ def test_find_link_in_content():
         (c, r) = func(q, sample)
         assert c == "[[Two-factor authentication]] is a 'strong authentication' method as it"
         assert r == q[0].upper() + q[1:]
+
+
+    q = 'spherical trigonometry'
+    sample = 'also presents the spherical trigonometrical formulae'
+
+    (c, r) = find_link_in_content('spherical trig', sample, linkto=q)
+    assert c == 'also presents the [[spherical trigonometry|spherical trigonometrical]] formulae'
+    assert r == 'spherical trigonometry|spherical trigonometrical'
 
     q = 'post-World War II baby boom'
     sample = 'huge boost during the post World War II [[Baby Boomer|Baby Boom]].'
@@ -414,6 +468,10 @@ def test_find_link_in_content():
         (c, r) = func(q, sample)
         assert c == 'Indeed, an important axiom that social scientists cite, but often forget, is that "[[correlation does not imply causation]]."'
         assert r == q
+
+    sample = "A '''pedestal desk''' is usually a large free-standing [[desk]]"
+    with py.test.raises(NoMatch):
+        find_link_in_content('standing desk', sample)
 
     pseudocode1 = 'These languages are typically [[Dynamic typing|dynamically typed]], meaning that variable declarations and other [[Boilerplate_(text)#Boilerplate_code|boilerplate code]] can be omitted.'
 
@@ -479,8 +537,6 @@ def test_find_link_in_content():
 
     station = 'Ticket barriers control access to all platforms, although the bridge entrance has no barriers.'
     (c, r) = find_link_in_content('ticket barriers', station, linkto='turnstile')
-    print 'failing'
-    print c
     assert c == station.replace('Ticket barriers', '[[Turnstile|Ticket barriers]]')
     assert r == 'Turnstile|Ticket barriers'
 
@@ -518,10 +574,13 @@ def test_find_link_in_content():
         assert r == 'London congestion charge'
     web_get = orig_web_get
 
-class NoMatch(Exception):
-    pass
+    q = 'recoil operation'
+    article = 'pattern of long-recoil operation as the 25mm and 40mm guns.'
 
-class BadLinkMatch(Exception):
+    search_for_link = mk_link_matcher(q)
+    assert not search_for_link(article)
+
+class NoMatch(Exception):
     pass
 
 class LinkReplace(Exception):
@@ -598,17 +657,12 @@ trans2 = { ' ': r"('?s?\]\])?'?s? ?(\[\[(?:.+\|)?)?", '-': '[- ]' }
 trans2[en_dash] = trans2[' ']
 
 patterns = [
-    lambda q: re.compile(r'(?:\[\[(?:[^]]+\|)?)?(%s)%s(?:\]\])?' % (q[0], ''.join('-?' + trans2.get(c, c) for c in q[1:])), re.I),
-    lambda q: re.compile('\[\[[^|]+\|(%s)%s\]\]' % (q[0], q[1:]), re.I),
-    lambda q: re.compile('\[\[[^|]+\|(%s)%s(?:\]\])?' % (q[0], ''.join('-?' + trans2.get(c, c) for c in q[1:])), re.I),
-    lambda q: re.compile('(%s)%s' % (q[0], q[1:]), re.I),
-    lambda q: re.compile('(%s)%s' % (q[0], ''.join(trans.get(c, c) for c in q[1:])), re.I),
+    lambda q: re.compile(r'(?<!-)(?:\[\[(?:[^]]+\|)?)?(%s)%s(?:\]\])?' % (q[0], ''.join('-?' + trans2.get(c, c) for c in q[1:])), re.I),
+    lambda q: re.compile(r'(?<!-)\[\[[^|]+\|(%s)%s\]\]' % (q[0], q[1:]), re.I),
+    lambda q: re.compile(r'(?<!-)\[\[[^|]+\|(%s)%s(?:\]\])?' % (q[0], ''.join('-?' + trans2.get(c, c) for c in q[1:])), re.I),
+    lambda q: re.compile(r'(?<!-)(%s)%s' % (q[0], q[1:]), re.I),
+    lambda q: re.compile(r'(?<!-)(%s)%s' % (q[0], ''.join(trans.get(c, c) for c in q[1:])), re.I),
 ]
-
-def test_patterns():
-    q = 'San Francisco'
-    assert patterns[3](q).pattern == '(S)' + q[1:]
-    assert patterns[4](q).pattern == '(S)an *[-\n]? *' + q[4:]
 
 def test_match_found():
     l = 'payment protection insurance'
@@ -692,6 +746,9 @@ def find_link_in_chunk(q, content, linkto=None):
                 lc_alpha = lambda s: ''.join(c.lower() for c in s if c.isalpha())
                 lc_alpha_q = lc_alpha(q)
                 bad_link_match = link_dest and len(link_dest) > len(q) and (lc_alpha_q not in lc_alpha(link_dest))
+                if not link_dest:
+                    if q in link_text and len(link_text) > len(q):
+                        bad_link_match = True
                 if bad_link_match and link_dest:
                     link_dest_redirect = get_wiki_info(link_dest)
                     if link_dest_redirect and lc_alpha(link_dest_redirect) == lc_alpha_q:
@@ -702,18 +759,22 @@ def find_link_in_chunk(q, content, linkto=None):
         new_content += text
     if not replacement:
         if bad_link_match:
-            raise BadLinkMatch
+            raise LinkReplace
         m = search_for_link(content)
         if m:
             replacement = match_found(m, q, linkto)
             new_content = add_link(m, replacement, content)
+            if linkto:
+                m_end = m.end()
+                re_extend = re.compile(m.re.pattern + r'\w*\b', re.I)
+                m = re_extend.search(content)
+                if m.end() > m_end:
+                    replacement += content[m_end:m.end()]
+                    new_content = add_link(m, replacement, content)
     return (new_content, replacement)
 
 def find_link_in_text(q, content): 
-    try:
-        (new_content, replacement) = find_link_in_chunk(q, content)
-    except BadLinkMatch:
-        raise LinkReplace
+    (new_content, replacement) = find_link_in_chunk(q, content)
     if replacement:
         return (new_content, replacement)
     raise NoMatch
@@ -734,7 +795,7 @@ def find_link_in_content(q, content, linkto=None):
             if token_type == 'text' and not replacement:
                 try:
                     (new_text, replacement) = find_link_in_chunk(q, text, linkto=linkto)
-                except BadLinkMatch:
+                except LinkReplace:
                     link_replace = True
                 if replacement:
                     text = new_text
@@ -880,6 +941,25 @@ def case_flip_first(s):
     return case_flip(s[0]) + s[1:]
 
 def match_type(q, snippet):
+    '''
+    >>> match_type('foo', 'foo')
+    'exact'
+    >>> match_type('foo', 'bar') is None
+    True
+    >>> match_type('bar', 'foo bar baz')
+    'exact'
+    >>> match_type('clean coal technology', 'foo clean coal technologies baz')
+    'exact'
+    >>> match_type('bar', 'foo Bar baz')
+    'exact'
+    >>> match_type('bar', 'foo BAR baz')
+    'case_mismatch'
+    >>> match_type('foo-bar', 'aa foo-bar cc')
+    'exact'
+    >>> match_type(u'foo\u2013bar', 'aa foo-bar cc')
+    'exact'
+    '''
+
     q = q.replace(u'\u2013', '-')
     snippet = snippet.replace(u'\u2013', '-')
     if q in snippet or case_flip_first(q) in snippet:
@@ -895,16 +975,6 @@ def match_type(q, snippet):
             match = 'case_mismatch'
     return match
  
-def test_match_type():
-    assert match_type('foo', 'foo') == 'exact'
-    assert match_type('foo', 'bar') == None
-    assert match_type('bar', 'foo bar baz') == 'exact'
-    assert match_type('clean coal technology', 'foo clean coal technologies baz') == 'exact'
-    assert match_type('bar', 'foo Bar baz') == 'exact'
-    assert match_type('bar', 'foo BAR baz') == 'case_mismatch'
-    assert match_type('foo-bar', 'aa foo-bar cc') == 'exact'
-    assert match_type(u'foo\u2013bar', 'aa foo-bar cc') == 'exact'
-
 def do_search(q, redirect_to):
     this_title = q[0].upper() + q[1:]
 
