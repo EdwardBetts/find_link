@@ -330,7 +330,6 @@ def test_parse_cite():
             found_duty = True
     assert found_duty
 
-
 re_cite = re.compile(r'<ref( [^>]*?)?>\s*({{cite.*?}}|\[https?://[^]]*?\])\s*</ref>', re.I | re.S)
 def parse_cite(text):
     prev = 0
@@ -454,6 +453,13 @@ def test_find_link_in_content():
     for func in find_link_in_content, find_link_in_text:
         (c, r) = func(q, sample)
         assert c == sample.replace('existence of [[God', '[[existence of God')
+        assert r == q
+
+    q = 'virtual machine'
+    sample = 'It compiles Python programs into intermediate bytecode, which is executed by the virtual machine. Jython compiles into Java byte code, which can then be executed by every [[Java Virtual Machine]] implementation. This also enables the use of Java class library functions from the Python program.'
+    for func in find_link_in_content, find_link_in_text:
+        (c, r) = func(q, sample)
+        assert c == sample.replace('virtual machine', '[[virtual machine]]')
         assert r == q
 
     q = 'existence of God'
@@ -919,8 +925,6 @@ def get_page(title, q, linkto=None):
         (content, replacement) = find_link_in_content(q, content, linkto)
     except NoMatch:
         return None
-
-    diff_url = "prop=revisions&rvprop=timestamp&titles=%s&rvdifftotext=%s" % (urlquote(title), urlquote(content))
 
     summary = "link [[%s]] using [[User:Edward/Find link|Find link]]" % replacement
 
