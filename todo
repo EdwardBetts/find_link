@@ -1,0 +1,3 @@
+* lines count is too high, split find link into separate files
+* cache wikipedia pages to improve performance and descrase load on wikimedia server
+

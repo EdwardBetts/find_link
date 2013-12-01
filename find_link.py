@@ -356,6 +356,14 @@ def test_avoid_link_in_cite():
     assert c == content.replace(tp, '[[' + tp + ']]')
     assert r == tp
 
+def test_coastal_sage_scrub():
+    sample = '''Depend on a [[habitat]] that has shown substantial historical or recent declines in size. This criterion infers the population viability of a species based on trends in the habitats upon which it specializes. Coastal [[wetland]]s, particularly in the urbanized [[San Francisco Bay]] and south-coastal areas, alluvial fan [[sage (plant)|sage]] [[scrubland|scrub]] and coastal sage scrub in the southern coastal basins, and arid scrub in the [[San Joaquin Valley]], are examples of California habitats that have seen dramatic reductions in size in recent history. Species that specialize in these habitats generally meet the criteria for Threatened or Endangered status or Special Concern status;'''
+    (c, r) = find_link_in_chunk('coastal sage scrub', sample)
+    print
+    print c
+    assert c == sample.replace('coastal sage scrub', '[[coastal sage scrub]]')
+    assert r == 'coastal sage scrub'
+
 def test_find_link_in_content():
     get_case_from_content = lambda s: None
     global web_get
@@ -716,7 +724,7 @@ def mk_link_matcher(q):
     def search_for_link(text):
         for re_link in re_links:
             m = re_link.search(text)
-            if m:
+            if m and m.group(0).count('[[') < 4:
                 return m
 
     return search_for_link
