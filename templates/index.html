@@ -8,7 +8,7 @@
 {% endif %}
 </title>
 <link rel="shortcut icon" href="{{url_for('static', filename='Link_edit.png')}}" />
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.4.4/jquery.min.js"></script> 
+<script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.0/jquery.min.js"></script> 
 <script>
 function diffview(params, num) {
     $.get('{{url_for('diff_view')}}?' + params, function(data) {
@@ -68,6 +68,12 @@ table.diff td div{ word-wrap:break-word; overflow:auto}
             $('#result').html('<p>backlinks:' + data.query.backlinks + '</p>');
         });
     }
+
+    $(function() {  // hide links from search engines
+        $("a[hidehref]").each(function() { 
+            $(this).attr('href', $(this).attr('hidehref'));
+        });   
+    });
     </script>
     <a href="http://en.wikipedia.org/wiki/{{esc_q}}">view article</a>
 {% endif %}
@@ -96,15 +102,13 @@ table.diff td div{ word-wrap:break-word; overflow:auto}
         <div id="results"></div>
     {% endif %}
     {% for num, doc in enumerate(results) %}
-        {# <pre>{{ doc | pprint() }}</pre> #}
         {% set esc_title = urlquote(doc.title.replace(' ', '_')) %}
         {% set params = 'q=' + urlquote(q) + '&title=' + urlquote(doc.title) %}
         {% if redirect_to %}
             {% set params = params + '&linkto=' + urlquote(redirect_to) %}
         {% endif %}
         {% set save_url = url_for('index') + '?' + params %}
-        {#<span id="save{{num}}" style="display:none"><a href="{{save_url}}" target="_blank">save</a></span> #}
-        <a href="{{save_url}}" target="_blank">{{ doc.title }}</a>
+        <a href="#" hidehref="{{save_url}}" target="_blank">{{ doc.title }}</a>
         ({{commify(doc.wordcount)}} words)
         <a href="javascript:{{urlquote("diffview('" + params + "', " + str(num) + ")")}}">[view diff]</a> 
         {% if doc.match == 'exact' %}<span class="exact">exact match in snippet</span>{% endif %}
