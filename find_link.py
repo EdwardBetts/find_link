@@ -13,7 +13,7 @@ app = Flask(__name__)
 app.config.from_pyfile('config')
 
 # SEARCH_BACKEND = 'LuceneSearch'  # old search
-SEARCH_BACKEND = 'CirrusSearch'  # new search
+SEARCH_BACKEND = '&srbackend=CirrusSearch'  # new search
 
 query_url = 'https://en.wikipedia.org/w/api.php?format=json&action=query&'
 #srprop = 'size|wordcount|timestamp|score|snippet|titlesnippet|sectionsnippet|sectiontitle|redirectsnippet|redirecttitle|hasrelated'
