@@ -702,7 +702,7 @@ def do_search(q, redirect_to):
         search = [doc for doc in search if doc['title'] not in disambig]
     # and (doc['title'] not in links or this_title not in links[doc['title']])]
         for doc in search:
-            without_markup = doc['snippet'].replace("<span class='searchmatch'>", "").replace("</span>", "").replace('  ', ' ')
+            without_markup = doc['snippet'].replace('<span class="searchmatch">', "").replace("</span>", "").replace('  ', ' ')
             doc['match'] = match_type(q, without_markup)
             doc['snippet_without_markup'] = without_markup
     return {
