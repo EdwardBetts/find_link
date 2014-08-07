@@ -1,0 +1,38 @@
+{% include 'head.html' %}
+
+<form action="{{ url_for('index')}} ">
+<input id="article" name="article" value="{{ article }}" size="60">
+<button type="submit">Search</button>
+</form>
+
+
+<script>
+$(function() {
+    $( "#article" ).autocomplete({
+      source: function( request, response ) {
+        $.ajax({
+          url: "http://en.wikipedia.org/w/api.php", 
+          dataType: "jsonp",
+          data: {
+            action: 'query',
+            apprefix: request.term,
+            format: 'json',
+            list: 'allpages',
+          },
+          success: function( data ) {
+            var titles = Array();
+            var pages = data['query']['allpages'];
+            for (x in pages) {
+                titles.push(pages[x]['title']);
+            }
+            response( titles );
+          }
+        });
+      },
+      minLength: 4,
+    });
+
+});
+</script>
+
+{% include 'foot.html' %}
