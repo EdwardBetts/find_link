@@ -316,16 +316,16 @@ def get_subsetions(text, section_num):
             continue
         if collection_level:
             if level > collection_level:
-                found += heading+body
+                found += heading + body
             else:
                 break
     return found
 
 en_dash = u'\u2013'
-trans = { ',': ',?', ' ': ' *[-\n]? *' }
+trans = {',': ',?', ' ': ' *[-\n]? *'}
 trans[en_dash] = trans[' ']
 
-trans2 = { ' ': r"('?s?\]\])?'?s? ?(\[\[(?:.+\|)?)?", '-': '[- ]' }
+trans2 = {' ': r"('?s?\]\])?'?s? ?(\[\[(?:.+\|)?)?", '-': '[- ]'}
 trans2[en_dash] = trans2[' ']
 
 patterns = [
@@ -445,7 +445,7 @@ def find_link_in_chunk(q, content, linkto=None):
     return (new_content, replacement)
 
 
-def find_link_in_text(q, content): 
+def find_link_in_text(q, content):
     (new_content, replacement) = find_link_in_chunk(q, content)
     if replacement:
         return (new_content, replacement)
