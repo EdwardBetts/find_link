@@ -8,7 +8,7 @@
 {% endif %}
 </title>
 <link rel="shortcut icon" href="{{url_for('static', filename='Link_edit.png')}}" />
-<script src="//ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script> 
+<script src="//ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
 <link rel="stylesheet" href="//ajax.googleapis.com/ajax/libs/jqueryui/1.11.0/themes/smoothness/jquery-ui.css" />
 <script src="//ajax.googleapis.com/ajax/libs/jqueryui/1.11.0/jquery-ui.min.js"></script>
 <script>
@@ -72,9 +72,9 @@ table.diff td div{ word-wrap:break-word; overflow:auto}
     }
 
     $(function() {  // hide links from search engines
-        $("a[hidehref]").each(function() { 
+        $("a[hidehref]").each(function() {
             $(this).attr('href', $(this).attr('hidehref'));
-        });   
+        });
     });
     </script>
     <a href="http://en.wikipedia.org/wiki/{{esc_q}}">view article</a>
@@ -99,7 +99,7 @@ table.diff td div{ word-wrap:break-word; overflow:auto}
         {% set alt_case = case_flip_first(q) %}
         alternate case: <a href="{{url_for('findlink', q=urlquote(alt_case.replace(' ', '_')))}}">{{alt_case}}</a><p>
     {% endif %}
-    {% if request.args.get('dev') %} 
+    {% if request.args.get('dev') %}
         <a href="javascript:get_redirects()">redirect here</a><br>
         <div id="results"></div>
     {% endif %}
@@ -112,7 +112,7 @@ table.diff td div{ word-wrap:break-word; overflow:auto}
         {% set save_url = url_for('index') + '?' + params %}
         <a href="#" hidehref="{{save_url}}" target="_blank">{{ doc.title }}</a>
         ({{commify(doc.wordcount)}} words)
-        <a href="javascript:{{urlquote("diffview('" + params + "', " + str(num) + ")")}}">[view diff]</a> 
+        <a href="javascript:{{urlquote("diffview('" + params + "', " + str(num) + ")")}}">[view diff]</a>
         {% if doc.match == 'exact' %}<span class="exact">exact match in snippet</span>{% endif %}
         {% if doc.match == 'case_mismatch' %}<span class="case_mismatch">case mismatch in snippet</span>{% endif %}
         {% if not doc.match %}<span class="nomatch">no match in snippet</span>{% endif %}
