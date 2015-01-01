@@ -8,7 +8,9 @@
 {% endif %}
 </title>
 <link rel="shortcut icon" href="{{url_for('static', filename='Link_edit.png')}}" />
-<script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.0/jquery.min.js"></script> 
+<script src="//ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script> 
+<link rel="stylesheet" href="//ajax.googleapis.com/ajax/libs/jqueryui/1.11.0/themes/smoothness/jquery-ui.css" />
+<script src="//ajax.googleapis.com/ajax/libs/jqueryui/1.11.0/jquery-ui.min.js"></script>
 <script>
 function diffview(params, num) {
     $.get('{{url_for('diff_view')}}?' + params, function(data) {
@@ -56,7 +58,7 @@ table.diff td div{ word-wrap:break-word; overflow:auto}
   <span class="flash">{{ message }}</span><br>
 {% endif %}
 <form class="well form-search" action="{{url_for('index')}}">
-<input name="q" value="{{ q }}" size="60" class="input-medium search-query">
+<input id="q" name="q" value="{{ q }}" size="60" class="input-medium search-query">
 <button type="submit" class="btn">Search</button>
 {% if q %}
     {% set esc_q = urlquote(q.replace(' ', '_')) %}
@@ -121,5 +123,34 @@ table.diff td div{ word-wrap:break-word; overflow:auto}
         <div id="diff{{num}}"></div>
     {% endfor %}
 {% endif %}
+<script>
+$(function() {
+    $( "#q" ).autocomplete({
+      source: function( request, response ) {
+        $.ajax({
+          url: "http://en.wikipedia.org/w/api.php",
+          dataType: "jsonp",
+          data: {
+            action: 'query',
+            apprefix: request.term,
+            aplimit: 50,
+            format: 'json',
+            list: 'allpages',
+          },
+          success: function( data ) {
+            var titles = Array();
+            var pages = data['query']['allpages'];
+            for (x in pages) {
+                titles.push(pages[x]['title']);
+            }
+            response( titles );
+          }
+        });
+      },
+      minLength: 4,
+    });
+
+});
+</script>
 </body>
 </html>
