@@ -73,15 +73,17 @@ def api_get(params):
     return s.get(query_url, params=params).json()
 
 
-def wiki_search(q):
+def strip_parens(q):
     m = re_end_parens.search(q)
-    if m:
-        q = q[:m.start()]
+    return q[:m.start()] if m else q
+
+
+def wiki_search(q):
     params = {
         'list': 'search',
         'srwhat': 'text',
         'srlimit': 50,
-        'srsearch': '"{}"'.format(q),
+        'srsearch': '"{}"'.format(strip_parens(q)),
     }
     ret = api_get(params)
     totalhits = ret['query']['searchinfo']['totalhits']
@@ -308,7 +310,8 @@ def section_iter(text):
     yield (heading, cur_section)
 
 
-def get_subsetions(text, section_num):
+def get_subsections(text, section_num):
+    'retrieve the text of subsections for a given section number within an article'
     found = ''
     collection_level = None
     for num, (heading, body) in enumerate(section_iter(text)):
@@ -549,7 +552,7 @@ def get_diff(q, title, linkto):
     content, timestamp = get_content_and_timestamp(title)
     found = find_link_and_section(q, content, linkto)
 
-    section_text = found['section_text'] + get_subsetions(content, found['section_num'])
+    section_text = found['section_text'] + get_subsections(content, found['section_num'])
     data = {
         'prop': 'revisions',
         'rvprop': 'timestamp',
@@ -558,7 +561,7 @@ def get_diff(q, title, linkto):
         'rvdifftotext': section_text.strip(),
     }
 
-    ret = s.post(query_url, data=data)
+    ret = s.post(query_url, data=data).json()
     diff = ret['query']['pages'].values()[0]['revisions'][0]['diff']['*']
     return (diff, found['replacement'])
 
@@ -645,6 +648,8 @@ def match_type(q, snippet):
 
     q = q.replace(u'\u2013', '-')
     snippet = snippet.replace(u'\u2013', '-')
+    snippet = snippet.replace(u'</span>', '')
+    snippet = snippet.replace(u'<span class="searchmatch">', '')
     if q in snippet or case_flip_first(q) in snippet:
         return 'exact'
     match = None
