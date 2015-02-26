@@ -2,7 +2,6 @@
 import urllib
 import json
 import re
-import logging
 from time import time
 from datetime import datetime
 from pprint import pprint
@@ -16,7 +15,7 @@ SEARCH_BACKEND = '&srbackend=LuceneSearch'  # old search
 # SEARCH_BACKEND = '&srbackend=CirrusSearch'  # new search
 
 query_url = 'https://en.wikipedia.org/w/api.php?format=json&action=query&'
-#srprop = 'size|wordcount|timestamp|score|snippet|titlesnippet|sectionsnippet|sectiontitle|redirectsnippet|redirecttitle|hasrelated'
+# srprop = 'size|wordcount|timestamp|score|snippet|titlesnippet|sectionsnippet|sectiontitle|redirectsnippet|redirecttitle|hasrelated'
 search_params          = 'list=search' '&srwhat=text' '&srlimit=50' + SEARCH_BACKEND + '&srsearch='
 new_page_params        = 'list=recentchanges' '&rclimit=50' '&rctype=new' '&rcnamespace=0' '&rcshow=!redirect'
 backlink_params        = 'list=backlinks' '&bllimit=500' '&blnamespace=0' '&bltitle='
@@ -540,7 +539,7 @@ def get_case_from_content(title):
         return title
     start = content.lower().find("'''" + title.replace('_', ' ').lower() + "'''")
     if start != -1:
-        return content[start+3:start+3+len(title)]
+        return content[start + 3:start + 3 + len(title)]
 
 
 def get_diff(q, title, linkto):
@@ -726,13 +725,13 @@ def findlink(q, title=None, message=None):
         redirect_to = get_wiki_info(q)
     except Missing:
         return render_template('index.html', message=q + " isn't an article")
-    #if redirect_to:
-    #    return redirect(url_for('findlink', q=redirect_to.replace(' ', '_')))
+    # if redirect_to:
+    #     return redirect(url_for('findlink', q=redirect_to.replace(' ', '_')))
     if redirect_to:
         if q[0].isupper():
-            redirect_to = redirect_to[0].upper() +  redirect_to[1:]
+            redirect_to = redirect_to[0].upper() + redirect_to[1:]
         elif q[0].islower():
-            redirect_to = redirect_to[0].lower() +  redirect_to[1:]
+            redirect_to = redirect_to[0].lower() + redirect_to[1:]
 
     ret = do_search(q, redirect_to)
 
@@ -740,16 +739,16 @@ def findlink(q, title=None, message=None):
         doc['snippet'] = Markup(doc['snippet'])
 
     return render_template('index.html', q=q,
-        totalhits = ret['totalhits'],
-        message = message,
-        results = ret['results'],
-        urlquote = urlquote,
-        commify = commify,
-        str = str,
-        enumerate = enumerate,
-        longer_titles = ret['longer'],
-        redirect_to = redirect_to,
-        case_flip_first = case_flip_first)
+        totalhits=ret['totalhits'],
+        message=message,
+        results=ret['results'],
+        urlquote=urlquote,
+        commify=commify,
+        str=str,
+        enumerate=enumerate,
+        longer_titles=ret['longer'],
+        redirect_to=redirect_to,
+        case_flip_first=case_flip_first)
 
 
 @app.route("/favicon.ico")
