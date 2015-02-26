@@ -29,20 +29,6 @@ save_to_cache = False
 
 re_heading = re.compile(r'^\s*(=+)\s*(.+)\s*\1(<!--.*-->|\s)*$')
 re_link_in_text = re.compile(r'\[\[[^]]+?\]\]', re.I | re.S)
-
-
-def commify(amount):
-    '''Return a number with commas, use for word count
-
-    >>> commify(1)
-    '1'
-    >>> commify(2222)
-    '2,222'
-    >>> commify('3333')
-    '3,333'
-    '''
-    return '{:,}'.format(int(amount))
-
 re_space_or_dash = re.compile('[ -]')
 
 
@@ -765,7 +751,6 @@ def findlink(q, title=None, message=None):
         message=message,
         results=ret['results'],
         urlquote=urlquote,
-        commify=commify,
         str=str,
         enumerate=enumerate,
         longer_titles=ret['longer'],

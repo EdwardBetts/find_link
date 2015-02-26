@@ -111,7 +111,7 @@ table.diff td div{ word-wrap:break-word; overflow:auto}
         {% endif %}
         {% set save_url = url_for('index') + '?' + params %}
         <a href="#" hidehref="{{save_url}}" target="_blank">{{ doc.title }}</a>
-        ({{commify(doc.wordcount)}} words)
+        ({{'{:,}'.format(doc.wordcount)}} words)
         <a href="javascript:{{urlquote("diffview('" + params + "', " + str(num) + ")")}}">[view diff]</a>
         {% if doc.match == 'exact' %}<span class="exact">exact match in snippet</span>{% endif %}
         {% if doc.match == 'case_mismatch' %}<span class="case_mismatch">case mismatch in snippet</span>{% endif %}
