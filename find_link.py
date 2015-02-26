@@ -2,31 +2,28 @@
 import urllib
 import json
 import re
+import requests
+from requests.adapters import HTTPAdapter
 from time import time
 from datetime import datetime
-from pprint import pprint
 
 from flask import Flask, render_template, request, Markup, redirect, url_for
 
 app = Flask(__name__)
 app.config.from_pyfile('config')
 
-SEARCH_BACKEND = '&srbackend=LuceneSearch'  # old search
-# SEARCH_BACKEND = '&srbackend=CirrusSearch'  # new search
+ua = "find-link/2.1 (https://github.com/EdwardBetts/find_link; contact: edward@4angle.com)"
+
+s = requests.Session()
+s.headers = {'User-Agent': ua}
+query_url = 'https://en.wikipedia.org/w/api.php'
+s.mount('https://en.wikipedia.org', HTTPAdapter(max_retries=10))
+s.params = {
+    'format': 'json',
+    'action': 'query',
+}
 
 query_url = 'https://en.wikipedia.org/w/api.php?format=json&action=query&'
-# srprop = 'size|wordcount|timestamp|score|snippet|titlesnippet|sectionsnippet|sectiontitle|redirectsnippet|redirecttitle|hasrelated'
-search_params          = 'list=search' '&srwhat=text' '&srlimit=50' + SEARCH_BACKEND + '&srsearch='
-new_page_params        = 'list=recentchanges' '&rclimit=50' '&rctype=new' '&rcnamespace=0' '&rcshow=!redirect'
-backlink_params        = 'list=backlinks' '&bllimit=500' '&blnamespace=0' '&bltitle='
-redirect_params        = 'list=backlinks' '&blfilterredir=redirects' '&bllimit=500' '&blnamespace=0' '&bltitle='
-content_params         = 'prop=revisions|info' '&rvprop=content|timestamp' '&titles='
-link_params            = 'prop=links' '&pllimit=500' '&plnamespace=0' '&titles='
-templates_params       = 'prop=templates' '&tllimit=500' '&tlnamespace=10' '&titles='
-allpages_params        = 'list=allpages' '&apnamespace=0' '&apfilterredir=nonredirects' '&aplimit=500' '&apprefix='
-info_params            = 'action=query' '&prop=info' '&redirects' '&titles='
-categorymembers_params = 'action=query' '&list=categorymembers' '&cmnamespace=0' '&cmlimit=500' '&cmtitle='
-cat_start_params = 'list=allpages' '&apnamespace=14' '&apfilterredir=nonredirects' '&aplimit=500' '&apprefix='
 
 save_to_cache = False
 
@@ -70,12 +67,6 @@ def is_title_case(phrase):
                for term in re_space_or_dash.split(phrase))
 
 
-class AppURLopener(urllib.FancyURLopener):
-    version = "find-link/2.0 (contact: edward@4angle.com)"
-
-urllib._urlopener = AppURLopener()
-
-
 def urlquote(value):
     '''prepare string for use in URL param
 
@@ -90,47 +81,30 @@ def urlquote(value):
     return urllib.quote_plus(value.encode('utf-8'))
 
 
-def web_get(params):
-    data = urllib.urlopen(query_url + params).read()
-    if save_to_cache:
-        out = open('cache/' + str(time()), 'w')
-        print >> out, params
-        print >> out, data
-        out.close()
-    try:
-        return json.loads(data)
-    except ValueError:
-        print data
-        raise
-
-
-def web_post(params):
-    '''POST to Wikipedia API.'''
-    data = urllib.urlopen('https://en.wikipedia.org/w/api.php',
-                          'format=json&action=query&' + params).read()
-    if save_to_cache:
-        out = open('cache/' + str(time()), 'w')
-        print >> out, params
-        print >> out, data
-        out.close()
-    return json.loads(data)
-
 re_end_parens = re.compile(r' \(.*\)$')
+
+def api_get(params):
+    return s.get(query_url, params=params).json()
 
 
 def wiki_search(q):
     m = re_end_parens.search(q)
     if m:
         q = q[:m.start()]
-    search_url = search_params + urlquote('"%s"' % q)
-    ret = web_get(search_url)
+    params = {
+        'list': 'search',
+        'srwhat': 'text',
+        'srlimit': 50,
+        'srsearch': '"{}"'.format(q),
+    }
+    ret = api_get(params)
     totalhits = ret['query']['searchinfo']['totalhits']
     results = ret['query']['search']
     for i in range(3):
         if 'query-continue' not in ret:
             break
-        sroffset = ret['query-continue']['search']['sroffset']
-        ret = web_get(search_url + ('&sroffset=%d' % sroffset))
+        params['sroffset'] = ret['query-continue']['search']['sroffset']
+        ret = api_get(params)
         results += ret['query']['search']
     return (totalhits, results)
 
@@ -140,7 +114,12 @@ class Missing (Exception):
 
 
 def get_wiki_info(q):
-    ret = web_get(info_params + urlquote(q))
+    params = {
+        'prop': 'info',
+        'redirects': '',
+        'titles': q,
+    }
+    ret = api_get(params)
     redirects = []
     if ret['query'].get('redirects'):
         redirects = ret['query']['redirects']
@@ -151,18 +130,37 @@ def get_wiki_info(q):
 
 
 def cat_start(q):
-    ret = web_get(cat_start_params + urlquote(q))
+    params = {
+        'list': 'allpages',
+        'apnamespace': 14,  # categories
+        'apfilterredir': 'nonredirects',
+        'aplimit': 500,
+        'apprefix': q,
+    }
+    ret = api_get(params)
     return [i['title'] for i in ret['query']['allpages'] if i['title'] != q]
 
 
 def all_pages(q):
-    ret = web_get(allpages_params + urlquote(q))
+    params = {
+        'list': 'allpages',
+        'apnamespace': 0,
+        'apfilterredir': 'nonredirects',
+        'aplimit': 500,
+        'apprefix': q,
+    }
+    ret = api_get(params)
     return [i['title'] for i in ret['query']['allpages'] if i['title'] != q]
 
 
 def categorymembers(q):
-    ret = web_get(categorymembers_params +
-                  urlquote(q[0].upper()) + urlquote(q[1:]))
+    params = {
+        'list': 'categorymembers',
+        'cmnamespace': 0,
+        'cmlimit': 500,
+        'cmtitle': q[0].upper() + q[1:],
+    }
+    ret = api_get(params)
     return [i['title']
             for i in ret['query']['categorymembers']
             if i['title'] != q]
@@ -171,7 +169,13 @@ def categorymembers(q):
 def page_links(titles):  # unused
     titles = list(titles)
     assert titles
-    ret = web_get(link_params + urlquote('|'.join(titles)))
+    params = {
+        'prop': 'links',
+        'pllimit': 500,
+        'plnamespace': 0,
+        'titles': '|'.join(titles)
+    }
+    ret = api_get(params)
     return dict((doc['title'], {l['title'] for l in doc['links']})
                 for doc in ret['query']['pages'].itervalues() if 'links' in doc)
 
@@ -197,14 +201,22 @@ def find_disambig(titles):
     assert titles
     pos = 0
     disambig = []
+    params = {
+        'prop': 'templates',
+        'tllimit': 500,
+        'tlnamespace': 10,  # templates
+    }
     while pos < len(titles):
-        ret = web_get(templates_params + urlquote('|'.join(titles[pos:pos+50])))
+        params['titles'] = '|'.join(titles[pos:pos + 50])
+        ret = api_get(params)
         disambig.extend(doc['title'] for doc in ret['query']['pages'].itervalues() if is_disambig(doc))
         for i in range(3):
             if 'query-continue' not in ret:
                 break
             tlcontinue = ret['query-continue']['templates']['tlcontinue']
-            ret = web_get(templates_params + urlquote('|'.join(titles[pos:pos+50])) + '&tlcontinue=' + urlquote(tlcontinue))
+            params['titles'] = '|'.join(titles[pos:pos + 50])
+            params['tlcontinue'] = tlcontinue
+            ret = api_get(params)
             disambig.extend(doc['title'] for doc in ret['query']['pages'].itervalues() if is_disambig(doc))
         pos += 50
 
@@ -232,34 +244,43 @@ re_redirect = re.compile(r'#REDIRECT \[\[(.)([^#]*?)(#.*)?\]\]')
 
 def is_redirect_to(title_from, title_to):
     title_from = title_from.replace('_', ' ')
-    ret = web_get('prop=info&titles=' + urlquote(title_from))
-    print query_url + 'prop=info&titles=' + urlquote(title_from)
+    params = {'prop': 'info', 'titles': title_from}
+    ret = api_get(params)
     if 'redirect' not in ret['query']['pages'].values()[0]:
         return False
 
-    params = 'prop=revisions&rvprop=content&titles='
-    ret = web_get(params + urlquote(title_from))
+    params = {'prop': 'revisions', 'rvprop': 'content', 'titles': title_from}
+    ret = api_get(params)
     page_text = ret['query']['pages'].values()[0]['revisions'][0]['*']
     m = re_redirect.match(page_text)
     title_to = title_to[0].upper() + title_to[1:]
     return m.group(1).upper() + m.group(2) == title_to
 
-
-def wiki_redirects(q): # pages that link here
-    docs = web_get(redirect_params + urlquote(q))['query']['backlinks']
+def wiki_redirects(q):  # pages that link here
+    params = {
+        'list': 'backlinks',
+        'blfilterredir': 'redirects',
+        'bllimit': 500,
+        'blnamespace': 0,
+        'bltitle': q,
+    }
+    docs = api_get(params)['query']['backlinks']
     assert all('redirect' in doc for doc in docs)
     return (doc['title'] for doc in docs)
 
 
 def wiki_backlink(q):
-    ret = web_get(backlink_params + urlquote(q))
-    if 'query' not in ret:
-        print 'backlink'
-        pprint(ret)
+    params = {
+        'list': 'backlinks',
+        'bllimit': 500,
+        'blnamespace': 0,
+        'bltitle': q,
+    }
+    ret = api_get(params)
     docs = ret['query']['backlinks']
     while 'query-continue' in ret:
-        blcontinue = ret['query-continue']['backlinks']['blcontinue']
-        ret = web_get(backlink_params + urlquote(q) + '&blcontinue=' + urlquote(blcontinue))
+        params['blcontinue'] = ret['query-continue']['backlinks']['blcontinue']
+        ret = api_get(params)
         docs += ret['query']['backlinks']
 
     articles = {doc['title'] for doc in docs if 'redirect' not in doc}
@@ -530,31 +551,30 @@ def find_link_and_section(q, content, linkto=None):
             return found
     raise NoMatch
 
-
 def get_case_from_content(title):
-    ret = web_get(content_params + urlquote(title))
-    rev = ret['query']['pages'].values()[0]['revisions'][0]
-    content = rev['*']
+    content, timestamp = get_content_and_timestamp(title)
     if title == title.lower() and title in content:
         return title
     start = content.lower().find("'''" + title.replace('_', ' ').lower() + "'''")
     if start != -1:
         return content[start + 3:start + 3 + len(title)]
 
-
 def get_diff(q, title, linkto):
     content, timestamp = get_content_and_timestamp(title)
     found = find_link_and_section(q, content, linkto)
 
-    section_text = found['section_text'] + get_subsetions(content,
-                                                          found['section_num'])
+    section_text = found['section_text'] + get_subsetions(content, found['section_num'])
+    data = {
+        'prop': 'revisions',
+        'rvprop': 'timestamp',
+        'titles': title,
+        'rvsection': found['section_num'],
+        'rvdifftotext': section_text.strip(),
+    }
 
-    diff_params = "prop=revisions&rvprop=timestamp&titles=%s&rvsection=%d&rvdifftotext=%s" % (urlquote(title), found['section_num'], urlquote(section_text.strip()))
-
-    ret = web_post(diff_params)
+    ret = s.post(query_url, data=data)
     diff = ret['query']['pages'].values()[0]['revisions'][0]['diff']['*']
     return (diff, found['replacement'])
-
 
 @app.route('/diff')
 def diff_view():
@@ -571,11 +591,13 @@ def diff_view():
 
 
 def get_content_and_timestamp(title):
-    ret = web_get(content_params + urlquote(title))
-    rev = ret['query']['pages'].values()[0]['revisions'][0]
-    content = rev['*']
-    timestamp = rev['timestamp']
-    return (content, timestamp)
+    params = {
+        'prop': 'revisions|info',
+        'rvprop': 'content|timestamp',
+        'titles': title,
+    }
+    rev = api_get(params)['query']['pages'].values()[0]['revisions'][0]
+    return (rev['*'], rev['timestamp'])
 
 
 def get_page(title, q, linkto=None):
@@ -758,7 +780,14 @@ def favicon():
 
 @app.route("/new_pages")
 def newpages():
-    np = web_get(new_page_params)['query']['recentchanges']
+    params = {
+        'list': 'recentchanges',
+        'rclimit': 50,
+        'rctype': 'new',
+        'rcnamespace': 0,
+        'rcshow': '!redirect',
+    }
+    np = api_get(params)['query']['recentchanges']
     return render_template('new_pages.html', new_pages=np)
 
 
