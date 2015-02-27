@@ -1,10 +1,8 @@
 # coding=utf-8
 import urllib
-import json
 import re
 import requests
 from requests.adapters import HTTPAdapter
-from time import time
 from datetime import datetime
 
 from flask import Flask, render_template, request, Markup, redirect, url_for
