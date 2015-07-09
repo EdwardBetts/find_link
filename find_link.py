@@ -81,15 +81,16 @@ def wiki_search(q):
         'list': 'search',
         'srwhat': 'text',
         'srlimit': 50,
-        'srsearch': '"{}"'.format(strip_parens(q)),
+        'srsearch': u'"{}"'.format(strip_parens(q)),
+        'continue': '',
     }
     ret = api_get(params)
     totalhits = ret['query']['searchinfo']['totalhits']
     results = ret['query']['search']
     for i in range(3):
-        if 'query-continue' not in ret:
+        if 'continue' not in ret:
             break
-        params['sroffset'] = ret['query-continue']['search']['sroffset']
+        params['sroffset'] = ret['continue']['sroffset']
         ret = api_get(params)
         results += ret['query']['search']
     return (totalhits, results)
@@ -191,15 +192,16 @@ def find_disambig(titles):
         'prop': 'templates',
         'tllimit': 500,
         'tlnamespace': 10,  # templates
+        'continue': '',
     }
     while pos < len(titles):
         params['titles'] = '|'.join(titles[pos:pos + 50])
         ret = api_get(params)
         disambig.extend(doc['title'] for doc in ret['query']['pages'].itervalues() if is_disambig(doc))
         for i in range(3):
-            if 'query-continue' not in ret:
+            if 'continue' not in ret:
                 break
-            tlcontinue = ret['query-continue']['templates']['tlcontinue']
+            tlcontinue = ret['continue']['tlcontinue']
             params['titles'] = '|'.join(titles[pos:pos + 50])
             params['tlcontinue'] = tlcontinue
             ret = api_get(params)
@@ -261,11 +263,12 @@ def wiki_backlink(q):
         'bllimit': 500,
         'blnamespace': 0,
         'bltitle': q,
+        'continue': '',
     }
     ret = api_get(params)
     docs = ret['query']['backlinks']
-    while 'query-continue' in ret:
-        params['blcontinue'] = ret['query-continue']['backlinks']['blcontinue']
+    while 'continue' in ret:
+        params['blcontinue'] = ret['continue']['blcontinue']
         ret = api_get(params)
         docs += ret['query']['backlinks']
 
@@ -423,6 +426,7 @@ def find_link_in_chunk(q, content, linkto=None):
             if m:
                 lc_alpha = lambda s: ''.join(c.lower() for c in s if c.isalpha())
                 lc_alpha_q = lc_alpha(q)
+
                 bad_link_match = link_dest and len(link_dest) > len(q) and (lc_alpha_q not in lc_alpha(link_dest))
                 if not link_dest:
                     if q in link_text and len(link_text) > len(q):
