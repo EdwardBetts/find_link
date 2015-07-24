@@ -1,3 +1,8 @@
 * lines count is too high, split find link into separate files
 * cache wikipedia pages to improve performance and decrease load on wikimedia server
+* reimplent diff_view to use JSONP on the client, then feed content back to the server
+* use timer to open diff_view for each result, pause 0.5 seconds between
+* hide results with no diff
+
+currently search grabs the first three pages, we should set a target number of articles instead.
 

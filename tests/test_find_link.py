@@ -6,7 +6,6 @@ sys.path.append('..')
 import find_link
 import unittest
 
-
 class TestFindLink(unittest.TestCase):
     @unittest.skip('broken')
     def test_get_case_from_content(self):
@@ -115,7 +114,7 @@ class TestFindLink(unittest.TestCase):
         totalhits, results = find_link.wiki_search('hedge (finance)')
         self.assertGreater(totalhits, 0)
 
-    #@unittest.skip('broken')
+    @unittest.skip('broken')
     def test_do_search(self):
         reply = find_link.do_search('market town', None)
         self.assertIsInstance(reply, dict)
