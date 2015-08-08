@@ -21,8 +21,6 @@ s.params = {
     'action': 'query',
 }
 
-query_url = 'https://en.wikipedia.org/w/api.php?format=json&action=query&'
-
 save_to_cache = False
 
 re_heading = re.compile(r'^\s*(=+)\s*(.+)\s*\1(<!--.*-->|\s)*$')
@@ -69,7 +67,6 @@ re_end_parens = re.compile(r' \(.*\)$')
 
 def api_get(params):
     return s.get(query_url, params=params).json()
-
 
 def strip_parens(q):
     m = re_end_parens.search(q)
