@@ -2,89 +2,117 @@
 import os
 import re
 import sys
+import json
+import unittest
+import responses
 sys.path.append('..')
 import find_link
-import unittest
-
 
 class TestFindLink(unittest.TestCase):
-    @unittest.skip('broken')
+    @responses.activate
     def test_get_case_from_content(self):
-        orig_web_get = find_link.web_get
         title = 'London congestion charge'
-        find_link.web_get = lambda params: {
-            'query': { 'pages': { 1: { 'revisions': [{
-                '*': "'''" + title + "'''"
-                }]}}
-        }}
+        url = 'https://en.wikipedia.org/w/api.php?action=query&prop=revisions%7Cinfo&titles=London+congestion+charge&rvprop=content%7Ctimestamp&format=json'
+        body = """{"query":{"pages":{"179439":{"revisions":[{"timestamp":"2015-08-07T15:37:03Z","*":"The '''London congestion charge''' is a fee charged on most motor vehicles operating within the Congestion Charge Zone (CCZ)"}]}}}}"""
+        responses.add(responses.GET, url, body=body, status=200, match_querystring=True)
         self.assertEqual(find_link.get_case_from_content(title), title)
 
         article = 'MyCar is exempt from the London Congestion Charge, road tax and parking charges.'
         for func in find_link.find_link_in_content, find_link.find_link_in_text:
             (c, r) = func('London congestion charge', article)
             self.assertEqual(r, 'London congestion charge')
-        find_link.web_get = orig_web_get
 
+    @responses.activate
     def test_get_wiki_info(self):
-        orig_web_get = find_link.web_get
-        find_link.web_get = lambda(param): {
+        body = json.dumps({
             "query":{
-                "normalized":[{
-                    "from":"government budget deficit",
-                    "to":"Government budget deficit"
+                "normalized": [{
+                    "from": "government budget deficit",
+                    "to": "Government budget deficit"
                 }],
-                "pages":{
-                    "312605":{
-                        "pageid":312605,"ns":0,"title":"Government budget deficit","touched":"2011-11-24T22:06:21Z","lastrevid":462258859,"counter":"","length":14071
+                "pages": {
+                    "312605": {
+                        "pageid": 312605,
+                        "ns": 0,
+                        "title": "Government budget deficit",
+                        "touched": "2011-11-24T22:06:21Z",
+                        "lastrevid": 462258859,
+                        "counter": "",
+                        "length": 14071
                     }
                 }
             }
-        }
+        })
+
+        url = 'https://en.wikipedia.org/w/api.php?action=query&redirects=&titles=government+budget+deficit&prop=info&format=json'
+        responses.add(responses.GET, url, body=body, status=200, match_querystring=True)
 
         redirect = find_link.get_wiki_info('government budget deficit')
         self.assertIsNone(redirect)
 
-        find_link.web_get = lambda(param): {
+        body = json.dumps({
             "query":{
-                "normalized":[{"from":"government budget deficits","to":"Government budget deficits"}],
-                "pages":{"-1":{"ns":0,"title":"Government budget deficits","missing":""}}
+                "normalized": [{"from": "government budget deficits", "to": "Government budget deficits"}],
+                "pages": {"-1": {"ns": 0, "title": "Government budget deficits", "missing": ""}}
             }
-        }
-        is_missing = False
+        })
+        url = 'https://en.wikipedia.org/w/api.php?action=query&redirects=&titles=government+budget+deficits&prop=info&format=json'
+        responses.add(responses.GET, url, body=body, status=200, match_querystring=True)
         self.assertRaises(find_link.Missing,
                           find_link.get_wiki_info,
                           'government budget deficits')
-        find_link.web_get = orig_web_get
 
+    @responses.activate
     def test_cat_start(self):
-        orig_web_get = find_link.web_get
-        find_link.web_get = lambda params: {"query": {"allpages": []}}
+        body = json.dumps({"query": {"allpages": []}})
+        url = 'https://en.wikipedia.org/w/api.php'
+        responses.add(responses.GET, url, body=body, status=200)
         self.assertEqual(find_link.cat_start('test123'), [])
-        find_link.web_get = orig_web_get
 
+    @responses.activate
     def test_all_pages(self):
-        orig_web_get = find_link.web_get
-        find_link.web_get = lambda params: {"query": {"allpages": [{"pageid": 312605,"ns":0,"title":"Government budget deficit"}]}}
+        body = json.dumps({"query": {"allpages": [{"pageid": 312605,"ns":0,"title":"Government budget deficit"}]}})
+        url = 'https://en.wikipedia.org/w/api.php?apfilterredir=nonredirects&apprefix=Government+budget+deficit&format=json&list=allpages&apnamespace=0&action=query&aplimit=500'
+        responses.add(responses.GET, url, body=body, status=200, match_querystring=True)
         result = find_link.all_pages('Government budget deficit')
         self.assertListEqual(result, [])
-        find_link.web_get = orig_web_get
 
+    @responses.activate
     def test_categorymembers(self):
-        orig_web_get = find_link.web_get
-        find_link.web_get = lambda params: {"query": {"categorymembers": []}}
+        body = json.dumps({"query": {"categorymembers": []}})
+        url = 'https://en.wikipedia.org/w/api.php?format=json&cmnamespace=0&list=categorymembers&cmlimit=500&action=query&cmtitle=Test123'
+        responses.add(responses.GET, url, body=body, status=200, match_querystring=True)
         self.assertListEqual(find_link.categorymembers('test123'), [])
-        find_link.web_get = orig_web_get
 
+    @responses.activate
     def test_is_redirect_to(self):
         title_from = 'Bread maker'
         title_to = 'Bread machine'
+
+        body = '{"batchcomplete":"","query":{"pages":{"1093444":{"pageid":1093444,"ns":0,"title":"Bread maker","contentmodel":"wikitext","pagelanguage":"en","touched":"2015-06-21T15:12:00Z","lastrevid":41586995,"length":27,"redirect":""}}}}'
+        url = 'https://en.wikipedia.org/w/api.php?action=query&titles=Bread+maker&prop=info&format=json'
+        responses.add(responses.GET, url, body=body, status=200, match_querystring=True)
+
+        url = 'https://en.wikipedia.org/w/api.php?action=query&prop=revisions&titles=Bread+maker&rvprop=content&format=json'
+
+        body = '{"batchcomplete":"","query":{"pages":{"1093444":{"pageid":1093444,"ns":0,"title":"Bread maker","revisions":[{"contentformat":"text/x-wiki","contentmodel":"wikitext","*":"#REDIRECT [[Bread machine]]"}]}}}}'
+
+        responses.add(responses.GET, url, body=body, status=200, match_querystring=True)
+
         self.assertTrue(find_link.is_redirect_to(title_from, title_to))
 
         title_from = 'Sugarlump'
         title_to = 'Sugar'
+        url = 'https://en.wikipedia.org/w/api.php?action=query&titles=Sugarlump&prop=info&format=json'
+        body = '{"batchcomplete":"","query":{"pages":{"-1":{"ns":0,"title":"Sugarlump","missing":"","contentmodel":"wikitext","pagelanguage":"en"}}}}'
+        responses.add(responses.GET, url, body=body, status=200, match_querystring=True)
         self.assertFalse(find_link.is_redirect_to(title_from, title_to))
 
+    @responses.activate
     def test_wiki_redirects(self):
+        url = 'https://en.wikipedia.org/w/api.php?blnamespace=0&format=json&list=backlinks&blfilterredir=redirects&bllimit=500&action=query&bltitle=market+town'
+        body = '{"query":{"backlinks":[{"pageid":383580,"title":"Market-town","redirect":""},{"pageid":1316024,"ns":0,"title":"Market towns","redirect":""},{"pageid":8494082,"ns":0,"title":"Marktgemeinde","redirect":""},{"pageid":15763709,"ns":0,"title":"Market right","redirect":""},{"pageid":23265231,"ns":0,"title":"Market towns in England","redirect":""},{"pageid":23386458,"ns":0,"title":"Market rights","redirect":""},{"pageid":24234988,"ns":0,"title":"Market charter","redirect":""},{"pageid":47397538,"ns":0,"title":"Market town privileges","redirect":""}]}}'
+        responses.add(responses.GET, url, body=body, status=200, match_querystring=True)
         result = find_link.wiki_redirects('market town')
         self.assertTrue(all(isinstance(title, basestring) for title in result))
 
@@ -109,14 +137,49 @@ class TestFindLink(unittest.TestCase):
         self.assertEqual(r, title)
         self.assertEqual(c, u'This is a [[obsessive\u2013compulsive disorder]] test')
 
+    @responses.activate
     def test_wiki_search(self):
+        url = 'https://en.wikipedia.org/w/api.php?srlimit=50&format=json&srsearch=%22coaching+inn%22&list=search&srwhat=text&continue=&action=query'
+        body = '{"batchcomplete":"","query":{"searchinfo":{"totalhits":444},"search":[{"ns":0,"title":"Coaching inn","snippet":"approximately the mid-17th century for a period of about 200 years, the <span class=\\"searchmatch\\">coaching</span> <span class=\\"searchmatch\\">inn</span>, sometimes called a coaching house or staging inn, was a vital part of","size":4918,"wordcount":561,"timestamp":"2015-08-04T13:20:24Z"},{"ns":0,"title":"Varbuse","snippet":"Estonian Road Museum is located in the former Varbuse <span class=\\"searchmatch\\">coaching</span> <span class=\\"searchmatch\\">inn</span>.       Varbuse <span class=\\"searchmatch\\">coaching</span> <span class=\\"searchmatch\\">inn</span>          Estonian Road Museum       &quot;Population by place","size":2350,"wordcount":96,"timestamp":"2015-01-02T23:23:10Z"}]}}'
+        responses.add(responses.GET, url, body=body, status=200, match_querystring=True)
+        url = 'https://en.wikipedia.org/w/api.php?srlimit=50&format=json&srsearch=%22hedge%22&list=search&srwhat=text&continue=&action=query'
+        responses.add(responses.GET, url, body=body, status=200, match_querystring=True)
         totalhits, results = find_link.wiki_search('coaching inn')
         self.assertGreater(totalhits, 0)
         totalhits, results = find_link.wiki_search('hedge (finance)')
         self.assertGreater(totalhits, 0)
 
-    #@unittest.skip('broken')
+    @responses.activate
     def test_do_search(self):
+        url = 'https://en.wikipedia.org/w/api.php?srlimit=50&format=json&srsearch=%22market+town%22&list=search&srwhat=text&continue=&action=query'
+        body = '{"query":{"searchinfo":{"totalhits":3593},"search":[{"ns":0,"title":"Market town","snippet":"<span class=\\"searchmatch\\">Market</span> <span class=\\"searchmatch\\">town</span> or market right is a legal term, originating in the medieval period, for a European settlement that has the right to host markets, distinguishing","size":10527,"wordcount":1362,"timestamp":"2015-06-25T18:19:23Z"},{"ns":0,"title":"V\\u011btrn\\u00fd Jen\\u00edkov","snippet":"V\\u011btrn\\u00fd Jen\\u00edkov (Czech pronunciation: [\\u02c8vj\\u025btr\\u0329ni\\u02d0\\u02c8j\\u025b\\u0272i\\u02d0kof]) is a <span class=\\"searchmatch\\">market</span> <span class=\\"searchmatch\\">town</span> in the Jihlava District, Vyso\\u010dina Region of the Czech Republic. About 582","size":833,"wordcount":76,"timestamp":"2013-02-28T19:49:34Z"}]}}'
+        responses.add(responses.GET, url, body=body, status=200, match_querystring=True)
+
+        url = 'https://en.wikipedia.org/w/api.php?blnamespace=0&format=json&list=backlinks&bllimit=500&continue=&action=query&bltitle=market+town'
+        body = '{"batchcomplete":"","query":{"backlinks":[{"pageid":1038,"ns":0,"title":"Aarhus"},{"pageid":1208,"ns":0,"title":"Alan Turing"},{"pageid":2715,"ns":0,"title":"Abergavenny"},{"pageid":4856,"ns":0,"title":"Borough"},{"pageid":5391,"ns":0,"title":"City"},{"pageid":6916,"ns":0,"title":"Colony"},{"pageid":8166,"ns":0,"title":"Devon"},{"pageid":13616,"ns":0,"title":"Howard Carter"},{"pageid":13861,"ns":0,"title":"Hampshire"},{"pageid":13986,"ns":0,"title":"Hertfordshire"},{"pageid":16143,"ns":0,"title":"John Locke"},{"pageid":16876,"ns":0,"title":"Kingston upon Thames"},{"pageid":19038,"ns":0,"title":"Municipality"},{"pageid":20206,"ns":0,"title":"Manchester"},{"pageid":22309,"ns":0,"title":"Oslo"},{"pageid":22422,"ns":0,"title":"Olney Hymns"},{"pageid":23241,"ns":0,"title":"Telecommunications in China"},{"pageid":25798,"ns":0,"title":"Reykjav\\u00edk"},{"pageid":25897,"ns":0,"title":"Road"},{"pageid":26316,"ns":0,"title":"Racial segregation"}]}}'
+        responses.add(responses.GET, url, body=body, status=200, match_querystring=True)
+
+        url = 'https://en.wikipedia.org/w/api.php?apfilterredir=nonredirects&apprefix=market+town&format=json&list=allpages&apnamespace=14&action=query&aplimit=500'
+        body = """{"query":{"allpages":[{"pageid":27601242,"ns":14,"title":"Category:Market towns"}]}}"""
+        responses.add(responses.GET, url, body=body, status=200, match_querystring=True)
+
+        url = 'https://en.wikipedia.org/w/api.php?format=json&cmnamespace=0&list=categorymembers&cmlimit=500&action=query&cmtitle=Category%3AMarket+town'
+        body = '{"batchcomplete":"","query":{"categorymembers":[]}}'
+        responses.add(responses.GET, url, body=body, status=200, match_querystring=True)
+
+        url = 'https://en.wikipedia.org/w/api.php?format=json&cmnamespace=0&list=categorymembers&cmlimit=500&action=query&cmtitle=Category%3AMarket+towns'
+        body = '{"batchcomplete":"","query":{"categorymembers":[]}}'
+        responses.add(responses.GET, url, body=body, status=200, match_querystring=True)
+
+        url = 'https://en.wikipedia.org/w/api.php?apfilterredir=nonredirects&apprefix=Market+town&format=json&list=allpages&apnamespace=0&action=query&aplimit=500'
+        body = '{"query":{"allpages":[{"pageid":145965,"ns":0,"title":"Market town"},{"pageid":13941316,"ns":0,"title":"Market towns of Buskerud county"}]}}'
+        responses.add(responses.GET, url, body=body, status=200, match_querystring=True)
+
+        url = 'https://en.wikipedia.org/w/api.php?titles=V%C4%9Btrn%C3%BD+Jen%C3%ADkov&tllimit=500&format=json&prop=templates&continue=&action=query&tlnamespace=10'
+        body = '{"batchcomplete":"","query":{"pages":{"17087711":{"pageid":17087711,"ns":0,"title":"V\u011btrn\u00fd Jen\u00edkov","templates":[{"ns":10,"title":"Template:Asbox"},{"ns":10,"title":"Template:Commons"},{"ns":10,"title":"Template:Commons category"},{"ns":10,"title":"Template:Commonscat"},{"ns":10,"title":"Template:Coord"},{"ns":10,"title":"Template:IPA"},{"ns":10,"title":"Template:IPA-cs"},{"ns":10,"title":"Template:Jihlava District"},{"ns":10,"title":"Template:Navbox"},{"ns":10,"title":"Template:Reflist"},{"ns":10,"title":"Template:Side box"},{"ns":10,"title":"Template:Sister project"},{"ns":10,"title":"Template:Talk other"},{"ns":10,"title":"Template:Vyso\u010dina-geo-stub"}]}}}}'
+        body = '{"query":{"pages":{"17087711":{"pageid":17087711,"ns":0,"title":"V\u011btrn\u00fd Jen\u00edkov","templates":[{"ns":10,"title":"Template:Asbox"},{"ns":10,"title":"Template:Commons"}]}}}}'
+        responses.add(responses.GET, url, body=body, status=200, match_querystring=True)
+
         reply = find_link.do_search('market town', None)
         self.assertIsInstance(reply, dict)
         self.assertSetEqual(set(reply.keys()), {'totalhits', 'results', 'longer'})
@@ -142,7 +205,7 @@ class TestFindLink(unittest.TestCase):
         self.assertEqual(c, content + ' [[' + tp + ']]')
         self.assertEqual(r, tp)
 
-        self.assertRaises(find_link.NoMatch, find_link.find_link_in_content, tp, content) 
+        self.assertRaises(find_link.NoMatch, find_link.find_link_in_content, tp, content)
         tp = 'abc'
         content = '==Early life==\n<ref>{{cite news|}}</ref>abc'
         (c, r) = find_link.find_link_in_content(tp, content)
@@ -180,9 +243,13 @@ Paragraph 3.
 ==Heading 4==
 Paragraph 4.
 '''
-        self.assertEqual(find_link.get_subsetions(text, 4), '')
+        self.assertEqual(find_link.get_subsections(text, 4), '')
 
+    @responses.activate
     def test_match_found(self):
+        url = 'https://en.wikipedia.org/w/api.php?action=query&prop=revisions%7Cinfo&titles=payment+protection+insurance&rvprop=content%7Ctimestamp&format=json'
+        body = """{"query":{"normalized":[{"from":"payment protection insurance","to":"Payment protection insurance"}],"pages":{"3469151":{"title":"Payment protection insurance","revisions":[{"timestamp":"2015-06-27T12:01:56Z","contentformat":"text/x-wiki","contentmodel":"wikitext","*":"'''Payment protection insurance''' ('''PPI'''), also known as '''credit insurance''', '''credit protection insurance''', or '''loan repayment insurance'''<ref>{{cite web | url=http://www.fsa.gov.uk/consumerinformation/product_news/insurance/payment_protection_insurance_/what-is-ppi | title=What is payment protection insurance? | accessdate=17 February 2014}}</ref>"}]}}}}"""
+        responses.add(responses.GET, url, body=body, status=200, match_querystring=True)
         l = 'payment protection insurance'
         l2 = 'payment Protection Insurance'
         m = re.compile('(P)' + l[1:], re.I).match('P' + l2[1:])
@@ -199,6 +266,7 @@ This sentence contains the test phrase.'''
         self.assertEqual(c, content.replace(tp, '[[' + tp + ']]'))
         self.assertEqual(r, tp)
 
+    @responses.activate
     def test_find_link_in_content(self): # this test is slow
         orig_get_case_from_content = find_link.get_case_from_content
         find_link.get_case_from_content = lambda s: None
@@ -276,7 +344,6 @@ This sentence contains the test phrase.'''
             self.assertEqual(c, "[[Two-factor authentication]] is a 'strong authentication' method as it")
             self.assertEqual(r, q[0].upper() + q[1:])
 
-
         q = 'spherical trigonometry'
         sample = 'also presents the spherical trigonometrical formulae'
 
@@ -305,9 +372,13 @@ This sentence contains the test phrase.'''
             self.assertEqual(c, sample.replace('virtual machine', '[[virtual machine]]'))
             self.assertEqual(r, q)
 
+        url = 'https://en.wikipedia.org/w/api.php?action=query&redirects=&titles=Teleological+argument&prop=info&format=json'
+        body = json.dumps({'query': {'pages': {'1': {}}}})
+
         q = 'existence of God'
         sample = '[[Intelligent design]] is an [[Teleological argument|argument for the existence of God]],'
         for func in find_link.find_link_in_content, find_link.find_link_in_text:
+            responses.add(responses.GET, url, body=body, status=200, match_querystring=True)
             self.assertRaises(find_link.LinkReplace, func, q, sample)
 
         q = 'correlation does not imply causation'
@@ -392,12 +463,12 @@ This sentence contains the test phrase.'''
             'Able to find this test\n  phrase in an article.',
             'Able to find this test  \nphrase in an article.',
             'Able to find this test\nphrase in an article.',
-            'Able to find this test-phrase in an article.', 
-            'Able to find this test PHRASE in an article.', 
-            'Able to find this TEST PHRASE in an article.', 
-            'Able to find this test\nPhrase in an article.', 
+            'Able to find this test-phrase in an article.',
+            'Able to find this test PHRASE in an article.',
+            'Able to find this TEST PHRASE in an article.',
+            'Able to find this test\nPhrase in an article.',
             'Able to find this [[test]] phrase in an article.',
-            'Able to find this TEST [[PHRASE]] in an article.', 
+            'Able to find this TEST [[PHRASE]] in an article.',
             'Able to find this [[testing|test]] phrase in an article.',
             'Able to find this testphrase in an article.']
 

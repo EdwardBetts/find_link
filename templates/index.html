@@ -18,6 +18,7 @@ function diffview(params, num) {
         // $('#save' + num).show();
     });
 }
+var auto_diff = false;
 </script>
 <style>
 body {
@@ -112,7 +113,12 @@ table.diff td div{ word-wrap:break-word; overflow:auto}
         {% set save_url = url_for('index') + '?' + params %}
         <a href="#" hidehref="{{save_url}}" target="_blank">{{ doc.title }}</a>
         ({{'{:,}'.format(doc.wordcount)}} words)
-        <a href="javascript:{{urlquote("diffview('" + params + "'," + str(num) + ")")}}">[view diff]</a>
+        <a href="javascript:{{urlquote("diffview('" + params + "', " + str(num) + ")")}}" class="view_diff_link">[view diff]</a>
+        <script>
+        if (auto_diff) {
+            window.setTimeout(diffview, {{ 1000 * (num + 1) }}, '{{params|safe}}', {{num}});
+        }
+        </script>
         {% if doc.match == 'exact' %}<span class="exact">exact match in snippet</span>{% endif %}
         {% if doc.match == 'case_mismatch' %}<span class="case_mismatch">case mismatch in snippet</span>{% endif %}
         {% if not doc.match %}<span class="nomatch">no match in snippet</span>{% endif %}
@@ -126,6 +132,7 @@ table.diff td div{ word-wrap:break-word; overflow:auto}
     {% endfor %}
 {% endif %}
 <script>
+
 $(function() {
     $( "#q" ).autocomplete({
       source: function( request, response ) {
