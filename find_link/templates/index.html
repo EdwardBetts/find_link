@@ -123,7 +123,9 @@ table.diff td div{ word-wrap:break-word; overflow:auto}
         {% if doc.match == 'case_mismatch' %}<span class="case_mismatch">case mismatch in snippet</span>{% endif %}
         {% if not doc.match %}<span class="nomatch">no match in snippet</span>{% endif %}
         <a href="http://en.wikipedia.org/wiki/{{esc_title}}" target="_blank">view article</a>
-        <a href="{{url_for('findlink', q=doc.title.replace(' ', '_'))}}" target="_blank">find links to article</a>
+        {% if '(' not in doc.title %}
+            <a href="{{url_for('findlink', q=doc.title.replace(' ', '_'))}}" target="_blank">find links to article</a>
+        {% endif %}
         <br>
         <blockquote>{{ doc.snippet }}</blockquote>
         <div id="diff{{num}}"></div>

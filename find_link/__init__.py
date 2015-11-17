@@ -108,7 +108,6 @@ def get_wiki_info(q):
         raise Missing
     return redirects[0]['to'] if redirects else None
 
-
 def cat_start(q):
     params = {
         'list': 'allpages',
