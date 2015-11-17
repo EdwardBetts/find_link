@@ -27,7 +27,6 @@ re_heading = re.compile(r'^\s*(=+)\s*(.+)\s*\1(<!--.*-->|\s)*$')
 re_link_in_text = re.compile(r'\[\[[^]]+?\]\]', re.I | re.S)
 re_space_or_dash = re.compile('[ -]')
 
-
 def is_title_case(phrase):
     '''Detected if a given phrase is in Title Case.
 
@@ -48,7 +47,6 @@ def is_title_case(phrase):
     return all(term[0].isupper() and term[1:].islower()
                for term in re_space_or_dash.split(phrase))
 
-
 def urlquote(value):
     '''prepare string for use in URL param
 
@@ -62,7 +60,6 @@ def urlquote(value):
 
     return urllib.quote_plus(value.encode('utf-8'))
 
-
 re_end_parens = re.compile(r' \(.*\)$')
 
 def api_get(params):
@@ -71,7 +68,6 @@ def api_get(params):
 def strip_parens(q):
     m = re_end_parens.search(q)
     return q[:m.start()] if m else q
-
 
 def wiki_search(q):
     params = {
@@ -124,7 +120,6 @@ def cat_start(q):
     ret = api_get(params)
     return [i['title'] for i in ret['query']['allpages'] if i['title'] != q]
 
-
 def all_pages(q):
     params = {
         'list': 'allpages',
@@ -135,7 +130,6 @@ def all_pages(q):
     }
     ret = api_get(params)
     return [i['title'] for i in ret['query']['allpages'] if i['title'] != q]
-
 
 def categorymembers(q):
     params = {
@@ -148,7 +142,6 @@ def categorymembers(q):
     return [i['title']
             for i in ret['query']['categorymembers']
             if i['title'] != q]
-
 
 def page_links(titles):  # unused
     titles = list(titles)
@@ -163,9 +156,9 @@ def page_links(titles):  # unused
     return dict((doc['title'], {l['title'] for l in doc['links']})
                 for doc in ret['query']['pages'].itervalues() if 'links' in doc)
 
-
 def is_disambig(doc):
     '''Is a this a disambiguation page?
+
     >>> is_disambig({})
     False
     >>> is_disambig({'templates':[{'title': 'disambig'},{'title': 'magic'}]})
@@ -175,10 +168,9 @@ def is_disambig(doc):
     >>> is_disambig({ 'templates': [ {'title': 'Disambig'}] })
     True
     '''
-    return any('disambig' in t or t.endswith('dis') or 'given name' in t
-               or t == 'template:surname' for t in
+    return any('disambig' in t or t.endswith('dis') or 'given name' in t or
+               t == 'template:surname' for t in
                (t['title'].lower() for t in doc.get('templates', [])))
-
 
 def find_disambig(titles):
     titles = list(titles)
@@ -209,7 +201,6 @@ def find_disambig(titles):
 
 re_non_letter = re.compile('\W', re.U)
 
-
 def norm(s):
     '''Normalise string.
 
@@ -225,7 +216,6 @@ def norm(s):
     return s[:-1] if s and s[-1] == 's' else s
 
 re_redirect = re.compile(r'#REDIRECT \[\[(.)([^#]*?)(#.*)?\]\]')
-
 
 def is_redirect_to(title_from, title_to):
     title_from = title_from.replace('_', ' ')
@@ -253,7 +243,6 @@ def wiki_redirects(q):  # pages that link here
     assert all('redirect' in doc for doc in docs)
     return (doc['title'] for doc in docs)
 
-
 def wiki_backlink(q):
     params = {
         'list': 'backlinks',
@@ -275,7 +264,6 @@ def wiki_backlink(q):
 
 re_cite = re.compile(r'<ref( [^>]*?)?>\s*({{cite.*?}}|\[https?://[^]]*?\])\s*</ref>', re.I | re.S)
 
-
 def parse_cite(text):
     prev = 0
     for m in re_cite.finditer(text):
@@ -291,7 +279,6 @@ class NoMatch(Exception):
 class LinkReplace(Exception):
     pass
 
-
 def section_iter(text):
     cur_section = ''
     heading = None
@@ -306,7 +293,6 @@ def section_iter(text):
         cur_section = ''
         continue
     yield (heading, cur_section)
-
 
 def get_subsections(text, section_num):
     'retrieve the text of subsections for a given section number within an article'
@@ -343,7 +329,6 @@ patterns = [
     lambda q: re.compile(r'(?<!-)(%s)%s' % (q[0], ''.join(trans.get(c, c) for c in q[1:])), re.I),
 ]
 
-
 def match_found(m, q, linkto):
     if q[1:] == m.group(0)[1:]:
         replacement = m.group(1) + q[1:]
@@ -365,7 +350,6 @@ def match_found(m, q, linkto):
         replacement = linkto + '|' + replacement
     return replacement
 
-
 def parse_links(text):
     prev = 0
     for m in re_link_in_text.finditer(text):
@@ -379,7 +363,6 @@ def parse_links(text):
     if prev < len(text):
         yield ('text', text[prev:])
 
-
 def mk_link_matcher(q):
     re_links = [p(q) for p in patterns]
 
@@ -391,10 +374,8 @@ def mk_link_matcher(q):
 
     return search_for_link
 
-
 def add_link(m, replacement, text):
     return m.re.sub(lambda m: "[[%s]]" % replacement, text, count=1)
-
 
 def find_link_in_chunk(q, content, linkto=None):
     search_for_link = mk_link_matcher(q)
@@ -452,13 +433,11 @@ def find_link_in_chunk(q, content, linkto=None):
                     new_content = add_link(m, replacement, content)
     return (new_content, replacement)
 
-
 def find_link_in_text(q, content):
     (new_content, replacement) = find_link_in_chunk(q, content)
     if replacement:
         return (new_content, replacement)
     raise NoMatch
-
 
 def find_link_in_content(q, content, linkto=None):
     if linkto:
@@ -484,7 +463,6 @@ def find_link_in_content(q, content, linkto=None):
     if replacement:
         return (new_content, replacement)
     raise LinkReplace if link_replace else NoMatch
-
 
 def find_link_and_section(q, content, linkto=None):
     if linkto:
@@ -577,7 +555,6 @@ def diff_view():
 
     return '<table>' + diff + '</table>'
 
-
 def get_content_and_timestamp(title):
     params = {
         'prop': 'revisions|info',
@@ -586,7 +563,6 @@ def get_content_and_timestamp(title):
     }
     rev = api_get(params)['query']['pages'].values()[0]['revisions'][0]
     return (rev['*'], rev['timestamp'])
-
 
 def get_page(title, q, linkto=None):
     content, timestamp = get_content_and_timestamp(title)
@@ -604,9 +580,9 @@ def get_page(title, q, linkto=None):
                            start_time=start_time, content=content, title=title,
                            summary=summary, timestamp=timestamp)
 
-
 def case_flip(s):
     '''Switch case of character.
+
     >>> case_flip("a")
     'A'
     >>> case_flip("A")
@@ -620,13 +596,12 @@ def case_flip(s):
         return s.lower()
     return s
 
-
 def case_flip_first(s):
     return case_flip(s[0]) + s[1:]
 
-
 def match_type(q, snippet):
     '''Discover match type, ''exact', 'case_mismatch' or None.
+
     >>> match_type('foo', 'foo')
     'exact'
     >>> match_type('foo', 'bar') is None
@@ -662,7 +637,6 @@ def match_type(q, snippet):
             match = 'case_mismatch'
     return match
 
-
 def find_longer(q, search, articles):
     this_title = q[0].upper() + q[1:]
     longer = all_pages(this_title)
@@ -678,7 +652,6 @@ def find_longer(q, search, articles):
             longer.append(doc['title'])
 
     return longer
-
 
 def do_search(q, redirect_to):
     this_title = q[0].upper() + q[1:]
@@ -722,7 +695,6 @@ def do_search(q, redirect_to):
         'longer': longer,
     }
 
-
 @app.route("/<path:q>")
 def findlink(q, title=None, message=None):
     if q and '%' in q:  # double encoding
@@ -761,11 +733,9 @@ def findlink(q, title=None, message=None):
         redirect_to=redirect_to,
         case_flip_first=case_flip_first)
 
-
 @app.route("/favicon.ico")
 def favicon():
     return redirect(url_for('static', filename='Link_edit.png'))
-
 
 @app.route("/new_pages")
 def newpages():
@@ -779,15 +749,12 @@ def newpages():
     np = api_get(params)['query']['recentchanges']
     return render_template('new_pages.html', new_pages=np)
 
-
 @app.route("/find_link/<q>")
 def bad_url(q):
     return findlink(q)
 
-
 def wiki_space_norm(s):
     return s.replace('_', ' ').strip()
-
 
 @app.route("/")
 def index():
