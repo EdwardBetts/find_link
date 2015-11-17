@@ -112,12 +112,14 @@ table.diff td div{ word-wrap:break-word; overflow:auto}
         {% set save_url = url_for('index') + '?' + params %}
         <a href="#" hidehref="{{save_url}}" target="_blank">{{ doc.title }}</a>
         ({{'{:,}'.format(doc.wordcount)}} words)
-        <a href="javascript:{{urlquote("diffview('" + params + "', " + str(num) + ")")}}">[view diff]</a>
+        <a href="javascript:{{urlquote("diffview('" + params + "'," + str(num) + ")")}}">[view diff]</a>
         {% if doc.match == 'exact' %}<span class="exact">exact match in snippet</span>{% endif %}
         {% if doc.match == 'case_mismatch' %}<span class="case_mismatch">case mismatch in snippet</span>{% endif %}
         {% if not doc.match %}<span class="nomatch">no match in snippet</span>{% endif %}
         <a href="http://en.wikipedia.org/wiki/{{esc_title}}" target="_blank">view article</a>
-        <a href="{{url_for('findlink', q=doc.title.replace(' ', '_'))}}" target="_blank">find links to article</a>
+        {% if '(' not in doc.title %}
+            <a href="{{url_for('findlink', q=doc.title.replace(' ', '_'))}}" target="_blank">find links to article</a>
+        {% endif %}
         <br>
         <blockquote>{{ doc.snippet }}</blockquote>
         <div id="diff{{num}}"></div>

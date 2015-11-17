@@ -115,7 +115,6 @@ def get_wiki_info(q):
         raise Missing
     return redirects[0]['to'] if redirects else None
 
-
 def cat_start(q):
     params = {
         'list': 'allpages',
@@ -126,7 +125,6 @@ def cat_start(q):
     }
     ret = api_get(params)
     return [i['title'] for i in ret['query']['allpages'] if i['title'] != q]
-
 
 def all_pages(q):
     params = {
@@ -139,7 +137,6 @@ def all_pages(q):
     ret = api_get(params)
     return [i['title'] for i in ret['query']['allpages'] if i['title'] != q]
 
-
 def categorymembers(q):
     params = {
         'list': 'categorymembers',
@@ -151,7 +148,6 @@ def categorymembers(q):
     return [i['title']
             for i in ret['query']['categorymembers']
             if i['title'] != q]
-
 
 def page_links(titles):  # unused
     titles = list(titles)
@@ -166,7 +162,6 @@ def page_links(titles):  # unused
     return dict((doc['title'], {l['title'] for l in doc['links']})
                 for doc in ret['query']['pages'].itervalues() if 'links' in doc)
 
-
 def is_disambig(doc):
     '''Is a this a disambiguation page?
     >>> is_disambig({})
@@ -178,10 +173,9 @@ def is_disambig(doc):
     >>> is_disambig({ 'templates': [ {'title': 'Disambig'}] })
     True
     '''
-    return any('disambig' in t or t.endswith('dis') or 'given name' in t
-               or t == 'template:surname' for t in
+    return any('disambig' in t or t.endswith('dis') or 'given name' in t or
+               t == 'template:surname' for t in
                (t['title'].lower() for t in doc.get('templates', [])))
-
 
 def find_disambig(titles):
     titles = list(titles)
@@ -211,7 +205,6 @@ def find_disambig(titles):
     return disambig
 
 re_non_letter = re.compile('\W', re.U)
-
 
 def norm(s):
     '''Normalise string.
