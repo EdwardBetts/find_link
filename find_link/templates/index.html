@@ -13,7 +13,7 @@
 <script src="//ajax.googleapis.com/ajax/libs/jqueryui/1.11.0/jquery-ui.min.js"></script>
 <script>
 function diffview(params, num) {
-    $.get('{{url_for('diff_view')}}?' + params, function(data) {
+    $.get('{{url_for(".diff_view")}}?' + params, function(data) {
         $('#diff' + num).html('<table>' + data + '</table>');
         // $('#save' + num).show();
     });
@@ -58,7 +58,7 @@ table.diff td div{ word-wrap:break-word; overflow:auto}
 {% if message %}
   <span class="flash">{{ message }}</span><br>
 {% endif %}
-<form class="well form-search" action="{{url_for('index')}}">
+<form class="well form-search" action="{{url_for('.index')}}">
 <input id="q" name="q" value="{{ q }}" size="60" class="input-medium search-query">
 <button type="submit" class="btn">Search</button>
 {% if q %}
@@ -89,7 +89,7 @@ table.diff td div{ word-wrap:break-word; overflow:auto}
         Longer titles found:
         {% for t in longer_titles %}
             {% set esc_title = urlquote(t.replace(' ', '_')) %}
-            <a href="{{ url_for('findlink', q=t.replace(' ', '_'))}}">{{t}}</a> (<a href="http://en.wikipedia.org/wiki/{{esc_title}}">view</a>){{ ',' if not loop.last }}
+            <a href="{{ url_for('.findlink', q=t.replace(' ', '_'))}}">{{t}}</a> (<a href="http://en.wikipedia.org/wiki/{{esc_title}}">view</a>){{ ',' if not loop.last }}
         {% endfor %}<p>
     {% endif %}
     {% if redirect_to %}
@@ -98,7 +98,7 @@ table.diff td div{ word-wrap:break-word; overflow:auto}
     searching for {{ q }} {{ results | length }} found ({{totalhits}} total)<p>
     {% if q[0].isalpha() and results: %}
         {% set alt_case = case_flip_first(q) %}
-        alternate case: <a href="{{url_for('findlink', q=urlquote(alt_case.replace(' ', '_')))}}">{{alt_case}}</a><p>
+        alternate case: <a href="{{url_for('.findlink', q=urlquote(alt_case.replace(' ', '_')))}}">{{alt_case}}</a><p>
     {% endif %}
     {% if request.args.get('dev') %}
         <a href="javascript:get_redirects()">redirect here</a><br>
@@ -110,7 +110,7 @@ table.diff td div{ word-wrap:break-word; overflow:auto}
         {% if redirect_to %}
             {% set params = params + '&linkto=' + urlquote(redirect_to) %}
         {% endif %}
-        {% set save_url = url_for('index') + '?' + params %}
+        {% set save_url = url_for('.index') + '?' + params %}
         <a href="#" hidehref="{{save_url}}" target="_blank">{{ doc.title }}</a>
         ({{'{:,}'.format(doc.wordcount)}} words)
         <a href="javascript:{{urlquote("diffview('" + params + "', " + str(num) + ")")}}" class="view_diff_link">[view diff]</a>
@@ -124,7 +124,7 @@ table.diff td div{ word-wrap:break-word; overflow:auto}
         {% if not doc.match %}<span class="nomatch">no match in snippet</span>{% endif %}
         <a href="http://en.wikipedia.org/wiki/{{esc_title}}" target="_blank">view article</a>
         {% if '(' not in doc.title %}
-            <a href="{{url_for('findlink', q=doc.title.replace(' ', '_'))}}" target="_blank">find links to article</a>
+            <a href="{{url_for('.findlink', q=doc.title.replace(' ', '_'))}}" target="_blank">find links to article</a>
         {% endif %}
         <br>
         <blockquote>{{ doc.snippet }}</blockquote>

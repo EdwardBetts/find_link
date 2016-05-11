@@ -5,7 +5,6 @@ import sys
 import json
 import unittest
 import responses
-sys.path.append('..')
 import find_link
 
 class TestFindLink(unittest.TestCase):
