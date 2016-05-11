@@ -12,8 +12,8 @@ def get_content_and_timestamp(title):
         'rvprop': 'content|timestamp',
         'titles': title,
     }
-    rev = list(api_get(params)['query']['pages'].values())[0]['revisions'][0]
-    return (rev['*'], rev['timestamp'])
+    rev = api_get(params)['query']['pages'][0]['revisions'][0]
+    return (rev['content'], rev['timestamp'])
 
 def is_redirect_to(title_from, title_to):
     title_from = title_from.replace('_', ' ')

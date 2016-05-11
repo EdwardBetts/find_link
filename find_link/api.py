@@ -11,6 +11,7 @@ s.mount('https://en.wikipedia.org', HTTPAdapter(max_retries=10))
 s.params = {
     'format': 'json',
     'action': 'query',
+    'formatversion': 2,
 }
 
 class Missing (Exception):
@@ -49,7 +50,7 @@ def get_wiki_info(q):
     if ret['query'].get('redirects'):
         redirects = ret['query']['redirects']
         assert len(redirects) == 1
-    if 'missing' in list(ret['query']['pages'].values())[0]:
+    if 'missing' in ret['query']['pages'][0]:
         raise Missing
     return redirects[0]['to'] if redirects else None
 
@@ -114,7 +115,7 @@ def find_disambig(titles):
     while pos < len(titles):
         params['titles'] = '|'.join(titles[pos:pos + 50])
         ret = api_get(params)
-        disambig.extend(doc['title'] for doc in ret['query']['pages'].values() if is_disambig(doc))
+        disambig.extend(doc['title'] for doc in ret['query']['pages'] if is_disambig(doc))
         for i in range(3):
             if 'continue' not in ret:
                 break
@@ -122,7 +123,7 @@ def find_disambig(titles):
             params['titles'] = '|'.join(titles[pos:pos + 50])
             params['tlcontinue'] = tlcontinue
             ret = api_get(params)
-            disambig.extend(doc['title'] for doc in ret['query']['pages'].values() if is_disambig(doc))
+            disambig.extend(doc['title'] for doc in ret['query']['pages'] if is_disambig(doc))
         pos += 50
 
     return disambig
@@ -168,4 +169,4 @@ def call_get_diff(title, section_num, section_text):
     }
 
     ret = s.post(query_url, data=data).json()
-    return list(ret['query']['pages'].values())[0]['revisions'][0]['diff']['*']
+    return ret['query']['pages'][0]['revisions'][0]['diff']['body']
