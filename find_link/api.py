@@ -168,4 +168,4 @@ def call_get_diff(title, section_num, section_text):
     }
 
     ret = s.post(query_url, data=data).json()
-    return ret['query']['pages'].values()[0]['revisions'][0]['diff']['*']
+    return list(ret['query']['pages'].values())[0]['revisions'][0]['diff']['*']

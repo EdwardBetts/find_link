@@ -12,19 +12,19 @@ def get_content_and_timestamp(title):
         'rvprop': 'content|timestamp',
         'titles': title,
     }
-    rev = api_get(params)['query']['pages'].values()[0]['revisions'][0]
+    rev = list(api_get(params)['query']['pages'].values())[0]['revisions'][0]
     return (rev['*'], rev['timestamp'])
 
 def is_redirect_to(title_from, title_to):
     title_from = title_from.replace('_', ' ')
     params = {'prop': 'info', 'titles': title_from}
     ret = api_get(params)
-    if 'redirect' not in ret['query']['pages'].values()[0]:
+    if 'redirect' not in list(ret['query']['pages'].values())[0]:
         return False
 
     params = {'prop': 'revisions', 'rvprop': 'content', 'titles': title_from}
     ret = api_get(params)
-    page_text = ret['query']['pages'].values()[0]['revisions'][0]['*']
+    page_text = list(ret['query']['pages'].values())[0]['revisions'][0]['*']
     m = re_redirect.match(page_text)
     title_to = title_to[0].upper() + title_to[1:]
     return m.group(1).upper() + m.group(2) == title_to
