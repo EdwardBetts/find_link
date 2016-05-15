@@ -1,6 +1,6 @@
 from __future__ import unicode_literals
 from .util import is_title_case, lc_alpha
-from .core import get_content_and_timestamp
+from .core import get_content_and_timestamp, get_case_from_content
 from .api import get_wiki_info, call_get_diff
 import re
 

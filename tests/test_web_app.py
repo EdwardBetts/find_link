@@ -5,7 +5,7 @@ import find_link
 
 class TestWebApp(unittest.TestCase):
     def setUp(self):
-        self.app = find_link.app.test_client()
+        self.app = find_link.create_app().test_client()
 
     def test_fav_icon(self):
         rv = self.app.get('/favicon.ico')
