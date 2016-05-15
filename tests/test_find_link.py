@@ -134,13 +134,27 @@ class TestFindLink(unittest.TestCase):
         title_from = 'Bread maker'
         title_to = 'Bread machine'
 
-        body = '{"batchcomplete":"","query":{"pages":{"1093444":{"pageid":1093444,"ns":0,"title":"Bread maker","contentmodel":"wikitext","pagelanguage":"en","touched":"2015-06-21T15:12:00Z","lastrevid":41586995,"length":27,"redirect":""}}}}'
-        url = 'https://en.wikipedia.org/w/api.php?action=query&formatversion=2&format=json&titles=Bread+maker&prop=info'
+        body = json.dumps({
+            "query": {
+                "pages": [{
+                    "pageid": 1093444,
+                    "ns": 0,
+                    "title": "Bread maker",
+                    "contentmodel": "wikitext",
+                    "pagelanguage": "en",
+                    "touched": "2015-06-21T15:12:00Z",
+                    "lastrevid": 41586995,
+                    "length": 27,
+                    "redirect": True
+                }]
+            }
+        })
+        url = wiki_url({'titles': 'Bread maker', 'prop': 'info'})
         responses.add(responses.GET, url, body=body, match_querystring=True)
 
-        url = 'https://en.wikipedia.org/w/api.php?action=query&format=json&formatversion=2&rvprop=content&titles=Bread+maker&prop=revisions'
+        url = wiki_url({'titles': 'Bread maker', 'prop': 'revisions', 'rvprop': 'content'})
 
-        body = '{"batchcomplete":"","query":{"pages":{"1093444":{"pageid":1093444,"ns":0,"title":"Bread maker","revisions":[{"contentformat":"text/x-wiki","contentmodel":"wikitext","*":"#REDIRECT [[Bread machine]]"}]}}}}'
+        body = '{"query":{"pages":[{"pageid":1093444,"ns":0,"title":"Bread maker","revisions":[{"contentformat":"text/x-wiki","contentmodel":"wikitext","content":"#REDIRECT [[Bread machine]]"}]}]}}'
 
         responses.add(responses.GET, url, body=body, match_querystring=True)
 
@@ -148,15 +162,31 @@ class TestFindLink(unittest.TestCase):
 
         title_from = 'Sugarlump'
         title_to = 'Sugar'
-        url = 'https://en.wikipedia.org/w/api.php?formatversion=2&action=query&format=json&titles=Sugarlump&prop=info'
-        body = '{"batchcomplete":"","query":{"pages":{"-1":{"ns":0,"title":"Sugarlump","missing":"","contentmodel":"wikitext","pagelanguage":"en"}}}}'
+        url = wiki_url({'prop': 'info', 'titles': 'Sugarlump'})
+        body = json.dumps({
+            "query": {
+                "pages": [
+                    {
+                        "ns": 0,
+                        "title": "Sugarlump",
+                        "missing": True,
+                        "contentmodel": "wikitext",
+                    }
+                ]
+            }
+        })
         responses.add(responses.GET, url, body=body, match_querystring=True)
         self.assertFalse(find_link.core.is_redirect_to(title_from, title_to))
 
     @responses.activate
     def test_wiki_redirects(self):
-        url = 'https://en.wikipedia.org/w/api.php?blnamespace=0&format=json&list=backlinks&blfilterredir=redirects&bllimit=500&action=query&bltitle=market+town'
-        url = 'https://en.wikipedia.org/w/api.php?format=json&action=query&formatversion=2&blfilterredir=redirects&bllimit=500&bltitle=market+town&list=backlinks&blnamespace=0'
+        url = wiki_url({
+            'blfilterredir': 'redirects',
+            'bllimit': 500,
+            'bltitle': 'market town',
+            'list': 'backlinks',
+            'blnamespace': 0,
+        })
         body = '{"query":{"backlinks":[{"pageid":383580,"title":"Market-town","redirect":""},{"pageid":1316024,"ns":0,"title":"Market towns","redirect":""},{"pageid":8494082,"ns":0,"title":"Marktgemeinde","redirect":""},{"pageid":15763709,"ns":0,"title":"Market right","redirect":""},{"pageid":23265231,"ns":0,"title":"Market towns in England","redirect":""},{"pageid":23386458,"ns":0,"title":"Market rights","redirect":""},{"pageid":24234988,"ns":0,"title":"Market charter","redirect":""},{"pageid":47397538,"ns":0,"title":"Market town privileges","redirect":""}]}}'
         responses.add(responses.GET, url, body=body, match_querystring=True)
         result = find_link.api.wiki_redirects('market town')
@@ -185,10 +215,25 @@ class TestFindLink(unittest.TestCase):
 
     @responses.activate
     def test_wiki_search(self):
-        url = 'https://en.wikipedia.org/w/api.php?action=query&formatversion=2&format=json&list=search&srlimit=50&srsearch=%22hedge%22&continue=&srwhat=text'
-        body = '{"batchcomplete":"","query":{"searchinfo":{"totalhits":444},"search":[{"ns":0,"title":"Coaching inn","snippet":"approximately the mid-17th century for a period of about 200 years, the <span class=\\"searchmatch\\">coaching</span> <span class=\\"searchmatch\\">inn</span>, sometimes called a coaching house or staging inn, was a vital part of","size":4918,"wordcount":561,"timestamp":"2015-08-04T13:20:24Z"},{"ns":0,"title":"Varbuse","snippet":"Estonian Road Museum is located in the former Varbuse <span class=\\"searchmatch\\">coaching</span> <span class=\\"searchmatch\\">inn</span>.       Varbuse <span class=\\"searchmatch\\">coaching</span> <span class=\\"searchmatch\\">inn</span>          Estonian Road Museum       &quot;Population by place","size":2350,"wordcount":96,"timestamp":"2015-01-02T23:23:10Z"}]}}'
+        url = wiki_url({
+            'list': 'search',
+            'srlimit': 50,
+            'srsearch': '"hedge"',
+            'continue': '',
+            'srwhat': 'text'
+        })
+
+        body = '{"query":{"searchinfo":{"totalhits":444},"search":[{"ns":0,"title":"Coaching inn","snippet":"approximately the mid-17th century for a period of about 200 years, the <span class=\\"searchmatch\\">coaching</span> <span class=\\"searchmatch\\">inn</span>, sometimes called a coaching house or staging inn, was a vital part of","size":4918,"wordcount":561,"timestamp":"2015-08-04T13:20:24Z"},{"ns":0,"title":"Varbuse","snippet":"Estonian Road Museum is located in the former Varbuse <span class=\\"searchmatch\\">coaching</span> <span class=\\"searchmatch\\">inn</span>.       Varbuse <span class=\\"searchmatch\\">coaching</span> <span class=\\"searchmatch\\">inn</span>          Estonian Road Museum       &quot;Population by place","size":2350,"wordcount":96,"timestamp":"2015-01-02T23:23:10Z"}]}}'
         responses.add(responses.GET, url, body=body, match_querystring=True)
-        url = 'https://en.wikipedia.org/w/api.php?format=json&formatversion=2&action=query&continue=&srsearch=%22coaching+inn%22&list=search&srlimit=50&srwhat=text'
+
+        url = wiki_url({
+            'continue': '',
+            'srsearch': '"coaching inn"',
+            'list': 'search',
+            'srlimit': 50,
+            'srwhat': 'text',
+        })
+
         responses.add(responses.GET, url, body=body, match_querystring=True)
         totalhits, results = find_link.api.wiki_search('coaching inn')
         self.assertGreater(totalhits, 0)
@@ -218,7 +263,7 @@ class TestFindLink(unittest.TestCase):
             'list': 'backlinks',
             'bltitle': 'market town'
         })
-        body = '{"batchcomplete":"","query":{"backlinks":[{"pageid":1038,"ns":0,"title":"Aarhus"},{"pageid":1208,"ns":0,"title":"Alan Turing"},{"pageid":2715,"ns":0,"title":"Abergavenny"},{"pageid":4856,"ns":0,"title":"Borough"},{"pageid":5391,"ns":0,"title":"City"},{"pageid":6916,"ns":0,"title":"Colony"},{"pageid":8166,"ns":0,"title":"Devon"},{"pageid":13616,"ns":0,"title":"Howard Carter"},{"pageid":13861,"ns":0,"title":"Hampshire"},{"pageid":13986,"ns":0,"title":"Hertfordshire"},{"pageid":16143,"ns":0,"title":"John Locke"},{"pageid":16876,"ns":0,"title":"Kingston upon Thames"},{"pageid":19038,"ns":0,"title":"Municipality"},{"pageid":20206,"ns":0,"title":"Manchester"},{"pageid":22309,"ns":0,"title":"Oslo"},{"pageid":22422,"ns":0,"title":"Olney Hymns"},{"pageid":23241,"ns":0,"title":"Telecommunications in China"},{"pageid":25798,"ns":0,"title":"Reykjav\\u00edk"},{"pageid":25897,"ns":0,"title":"Road"},{"pageid":26316,"ns":0,"title":"Racial segregation"}]}}'
+        body = '{"query":{"backlinks":[{"pageid":1038,"ns":0,"title":"Aarhus"},{"pageid":1208,"ns":0,"title":"Alan Turing"},{"pageid":2715,"ns":0,"title":"Abergavenny"},{"pageid":4856,"ns":0,"title":"Borough"},{"pageid":5391,"ns":0,"title":"City"},{"pageid":6916,"ns":0,"title":"Colony"},{"pageid":8166,"ns":0,"title":"Devon"},{"pageid":13616,"ns":0,"title":"Howard Carter"},{"pageid":13861,"ns":0,"title":"Hampshire"},{"pageid":13986,"ns":0,"title":"Hertfordshire"},{"pageid":16143,"ns":0,"title":"John Locke"},{"pageid":16876,"ns":0,"title":"Kingston upon Thames"},{"pageid":19038,"ns":0,"title":"Municipality"},{"pageid":20206,"ns":0,"title":"Manchester"},{"pageid":22309,"ns":0,"title":"Oslo"},{"pageid":22422,"ns":0,"title":"Olney Hymns"},{"pageid":23241,"ns":0,"title":"Telecommunications in China"},{"pageid":25798,"ns":0,"title":"Reykjav\\u00edk"},{"pageid":25897,"ns":0,"title":"Road"},{"pageid":26316,"ns":0,"title":"Racial segregation"}]}}'
         responses.add(responses.GET, url, body=body, match_querystring=True)
 
         url = wiki_url({
@@ -230,7 +275,7 @@ class TestFindLink(unittest.TestCase):
             'apfilterredir': 'nonredirects',
             'list': 'allpages'
         })
-        body = """{"query":{"allpages":[{"pageid":27601242,"ns":14,"title":"Category:Market towns"}]}}"""
+        body = '{"query":{"allpages":[{"pageid":27601242,"ns":14,"title":"Category:Market towns"}]}}'
         responses.add(responses.GET, url, body=body, match_querystring=True)
 
         url = wiki_url({
@@ -241,7 +286,7 @@ class TestFindLink(unittest.TestCase):
             'format': 'json',
             'list': 'categorymembers'
         })
-        body = '{"batchcomplete":"","query":{"categorymembers":[]}}'
+        body = '{"query":{"categorymembers":[]}}'
         responses.add(responses.GET, url, body=body, match_querystring=True)
 
         url = wiki_url({
@@ -252,7 +297,7 @@ class TestFindLink(unittest.TestCase):
             'format': 'json',
             'list': 'categorymembers'
         })
-        body = '{"batchcomplete":"","query":{"categorymembers":[]}}'
+        body = '{"query":{"categorymembers":[]}}'
         responses.add(responses.GET, url, body=body, match_querystring=True)
 
         url = wiki_url({
@@ -345,7 +390,6 @@ Paragraph 4.
 
     @responses.activate
     def test_match_found(self):
-        url = 'https://en.wikipedia.org/w/api.php?action=query&prop=revisions%7Cinfo&titles=payment+protection+insurance&rvprop=content%7Ctimestamp&format=json'
         url = wiki_url({'prop': 'revisions|info', 'titles': 'payment protection insurance', 'rvprop': 'content|timestamp'})
 
         content = "{{multiple issues|\n{{Globalize|2=the United Kingdom|date=July 2011}}\n{{Original research|date=April 2009}}\n}}\n'''Payment protection insurance''' ('''PPI'''), also known as '''credit insurance''', '''credit protection insurance''', or '''loan repayment insurance''', is an insurance product that enables consumers to insure repayment of credit if the borrower dies, becomes ill or disabled, loses a job, or faces other circumstances that may prevent them from earning income to service the debt. It is not to be confused with [[income protection insurance]], which is not specific to a debt but covers any income. PPI was widely sold by banks and other credit providers as an add-on to the loan or overdraft product.<ref>{{cite web | url=http://www.fsa.gov.uk/consumerinformation/product_news/insurance/payment_protection_insurance_/what-is-ppi | title=What is payment protection insurance? | accessdate=17 February 2014}}</ref>"
