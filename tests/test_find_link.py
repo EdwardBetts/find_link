@@ -20,6 +20,12 @@ def wiki_url(params):
 
     return url
 
+def one_page(page):
+    return json.dumps({'query': {'pages': [page]}})
+
+def json_query(query):
+    return json.dumps({'query': query})
+
 class TestFindLink(unittest.TestCase):
     @responses.activate
     def test_get_case_from_content(self):
@@ -29,7 +35,14 @@ class TestFindLink(unittest.TestCase):
             'rvprop': 'content|timestamp',
             'titles': title,
         })
-        body = """{"query":{"pages":[{"revisions":[{"timestamp":"2015-08-07T15:37:03Z","content":"The '''London congestion charge''' is a fee charged on most motor vehicles operating within the Congestion Charge Zone (CCZ)"}]}]}}"""
+        body = one_page({
+            "revisions": [{
+                "timestamp": "2015-08-07T15:37:03Z",
+                "content": ("The '''London congestion charge''' is a fee "
+                            "charged on most motor vehicles operating within "
+                            "the Congestion Charge Zone (CCZ)")
+            }]
+        })
         responses.add(responses.GET, url, body=body, match_querystring=True)
         self.assertEqual(find_link.core.get_case_from_content(title), title)
 
@@ -40,22 +53,14 @@ class TestFindLink(unittest.TestCase):
 
     @responses.activate
     def test_get_wiki_info(self):
-        body = json.dumps({
-            "query": {
-                "normalized": [{
-                    "from": "government budget deficit",
-                    "to": "Government budget deficit"
-                }],
-                "pages": [{
-                    "pageid": 312605,
-                    "ns": 0,
-                    "title": "Government budget deficit",
-                    "touched": "2011-11-24T22:06:21Z",
-                    "lastrevid": 462258859,
-                    "counter": "",
-                    "length": 14071
-                }]
-            }
+        body = one_page({
+            'pageid': 312605,
+            'ns': 0,
+            'title': 'Government budget deficit',
+            'touched': '2011-11-24T22:06:21Z',
+            'lastrevid': 462258859,
+            'counter': '',
+            'length': 14071
         })
 
         url = wiki_url({
@@ -68,18 +73,10 @@ class TestFindLink(unittest.TestCase):
         redirect = find_link.api.get_wiki_info('government budget deficit')
         self.assertIsNone(redirect)
 
-        body = json.dumps({
-            'query': {
-                'normalized': [{
-                    'from': 'government budget deficits',
-                    'to': 'Government budget deficits'
-                }],
-                'pages': [{
-                    'ns': 0,
-                    'title': 'Government budget deficits',
-                    'missing': True
-                }],
-            }
+        body = one_page({
+            'ns': 0,
+            'title': 'Government budget deficits',
+            'missing': True
         })
         url = wiki_url({
             'redirects': '',
@@ -102,10 +99,8 @@ class TestFindLink(unittest.TestCase):
     @responses.activate
     def test_all_pages(self):
         title = 'Government budget deficit'
-        body = json.dumps({
-            "query": {
-                "allpages": [{"pageid": 312605, "ns": 0, "title": title}]
-            }
+        body = json_query({
+            "allpages": [{"pageid": 312605, "ns": 0, "title": title}]
         })
         url = wiki_url({'apfilterredir': 'nonredirects',
                         'apprefix': title,
@@ -118,7 +113,7 @@ class TestFindLink(unittest.TestCase):
 
     @responses.activate
     def test_categorymembers(self):
-        body = json.dumps({"query": {"categorymembers": []}})
+        body = json_query({"categorymembers": []})
         url = wiki_url({
             'cmnamespace': 0,
             'list':
@@ -134,27 +129,27 @@ class TestFindLink(unittest.TestCase):
         title_from = 'Bread maker'
         title_to = 'Bread machine'
 
-        body = json.dumps({
-            "query": {
-                "pages": [{
-                    "pageid": 1093444,
-                    "ns": 0,
-                    "title": "Bread maker",
-                    "contentmodel": "wikitext",
-                    "pagelanguage": "en",
-                    "touched": "2015-06-21T15:12:00Z",
-                    "lastrevid": 41586995,
-                    "length": 27,
-                    "redirect": True
-                }]
-            }
+        body = one_page({
+            'ns': 0,
+            'title': 'Bread maker',
+            'touched': '2015-06-21T15:12:00Z',
+            'length': 27,
+            'redirect': True
         })
         url = wiki_url({'titles': 'Bread maker', 'prop': 'info'})
         responses.add(responses.GET, url, body=body, match_querystring=True)
 
         url = wiki_url({'titles': 'Bread maker', 'prop': 'revisions', 'rvprop': 'content'})
 
-        body = '{"query":{"pages":[{"pageid":1093444,"ns":0,"title":"Bread maker","revisions":[{"contentformat":"text/x-wiki","contentmodel":"wikitext","content":"#REDIRECT [[Bread machine]]"}]}]}}'
+        body = one_page({
+            'ns': 0,
+            'title': 'Bread maker',
+            'revisions': [{
+                'contentformat': 'text/x-wiki',
+                'contentmodel': 'wikitext',
+                'content': '#REDIRECT [[Bread machine]]'
+            }]
+        })
 
         responses.add(responses.GET, url, body=body, match_querystring=True)
 
@@ -163,17 +158,11 @@ class TestFindLink(unittest.TestCase):
         title_from = 'Sugarlump'
         title_to = 'Sugar'
         url = wiki_url({'prop': 'info', 'titles': 'Sugarlump'})
-        body = json.dumps({
-            "query": {
-                "pages": [
-                    {
-                        "ns": 0,
-                        "title": "Sugarlump",
-                        "missing": True,
-                        "contentmodel": "wikitext",
-                    }
-                ]
-            }
+        body = one_page({
+            'ns': 0,
+            'title': 'Sugarlump',
+            'missing': True,
+            'contentmodel': 'wikitext',
         })
         responses.add(responses.GET, url, body=body, match_querystring=True)
         self.assertFalse(find_link.core.is_redirect_to(title_from, title_to))
@@ -187,7 +176,18 @@ class TestFindLink(unittest.TestCase):
             'list': 'backlinks',
             'blnamespace': 0,
         })
-        body = '{"query":{"backlinks":[{"pageid":383580,"title":"Market-town","redirect":""},{"pageid":1316024,"ns":0,"title":"Market towns","redirect":""},{"pageid":8494082,"ns":0,"title":"Marktgemeinde","redirect":""},{"pageid":15763709,"ns":0,"title":"Market right","redirect":""},{"pageid":23265231,"ns":0,"title":"Market towns in England","redirect":""},{"pageid":23386458,"ns":0,"title":"Market rights","redirect":""},{"pageid":24234988,"ns":0,"title":"Market charter","redirect":""},{"pageid":47397538,"ns":0,"title":"Market town privileges","redirect":""}]}}'
+        body = json_query({
+            'backlinks': [
+                {'title': 'Market-town', 'redirect': ''},
+                {'title': 'Market towns', 'redirect': ''},
+                {'title': 'Marktgemeinde', 'redirect': ''},
+                {'title': 'Market right', 'redirect': ''},
+                {'title': 'Market towns in England', 'redirect': ''},
+                {'title': 'Market rights', 'redirect': ''},
+                {'title': 'Market charter', 'redirect': ''},
+                {'title': 'Market town privileges', 'redirect': ''}
+            ]
+        })
         responses.add(responses.GET, url, body=body, match_querystring=True)
         result = find_link.api.wiki_redirects('market town')
         self.assertTrue(all(isinstance(title, str) for title in result))
@@ -223,7 +223,24 @@ class TestFindLink(unittest.TestCase):
             'srwhat': 'text'
         })
 
-        body = '{"query":{"searchinfo":{"totalhits":444},"search":[{"ns":0,"title":"Coaching inn","snippet":"approximately the mid-17th century for a period of about 200 years, the <span class=\\"searchmatch\\">coaching</span> <span class=\\"searchmatch\\">inn</span>, sometimes called a coaching house or staging inn, was a vital part of","size":4918,"wordcount":561,"timestamp":"2015-08-04T13:20:24Z"},{"ns":0,"title":"Varbuse","snippet":"Estonian Road Museum is located in the former Varbuse <span class=\\"searchmatch\\">coaching</span> <span class=\\"searchmatch\\">inn</span>.       Varbuse <span class=\\"searchmatch\\">coaching</span> <span class=\\"searchmatch\\">inn</span>          Estonian Road Museum       &quot;Population by place","size":2350,"wordcount":96,"timestamp":"2015-01-02T23:23:10Z"}]}}'
+        body = json_query({
+            "searchinfo": {"totalhits": 444},
+            "search": [{
+                "ns": 0,
+                "title": "Coaching inn",
+                "snippet": "approximately the mid-17th century for a period of about 200 years, the <span class=\"searchmatch\">coaching</span> <span class=\"searchmatch\">inn</span>, sometimes called a coaching house or staging inn, was a vital part of",
+                "size": 4918,
+                "wordcount": 561,
+                "timestamp": "2015-08-04T13:20:24Z"
+            }, {
+                "ns": 0,
+                "title": "Varbuse",
+                "snippet": "Estonian Road Museum is located in the former Varbuse <span class=\"searchmatch\">coaching</span> <span class=\"searchmatch\">inn</span>.       Varbuse <span class=\"searchmatch\">coaching</span> <span class=\"searchmatch\">inn</span>          Estonian Road Museum       &quot;Population by place",
+                "size": 2350,
+                "wordcount": 96,
+                "timestamp":"2015-01-02T23:23:10Z"
+            }]
+        })
         responses.add(responses.GET, url, body=body, match_querystring=True)
 
         url = wiki_url({
