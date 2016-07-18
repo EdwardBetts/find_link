@@ -18,7 +18,10 @@ class Missing (Exception):
     pass
 
 def api_get(params):
-    return s.get(query_url, params=params).json()
+    return s.get(query_url, params=params).json()['query']
+
+def get_first_page(params):
+    return api_get(params)['pages'][0]
 
 def wiki_search(q):
     params = {
@@ -29,14 +32,14 @@ def wiki_search(q):
         'continue': '',
     }
     ret = api_get(params)
-    totalhits = ret['query']['searchinfo']['totalhits']
-    results = ret['query']['search']
+    totalhits = ret['searchinfo']['totalhits']
+    results = ret['search']
     for i in range(3):
         if 'continue' not in ret:
             break
         params['sroffset'] = ret['continue']['sroffset']
         ret = api_get(params)
-        results += ret['query']['search']
+        results += ret['search']
     return (totalhits, results)
 
 def get_wiki_info(q):
@@ -47,10 +50,10 @@ def get_wiki_info(q):
     }
     ret = api_get(params)
     redirects = []
-    if ret['query'].get('redirects'):
-        redirects = ret['query']['redirects']
+    if ret.get('redirects'):
+        redirects = ret['redirects']
         assert len(redirects) == 1
-    if 'missing' in ret['query']['pages'][0]:
+    if 'missing' in ret['pages'][0]:
         raise Missing
     return redirects[0]['to'] if redirects else None
 
@@ -63,7 +66,7 @@ def cat_start(q):
         'apprefix': q,
     }
     ret = api_get(params)
-    return [i['title'] for i in ret['query']['allpages'] if i['title'] != q]
+    return [i['title'] for i in ret['allpages'] if i['title'] != q]
 
 def all_pages(q):
     params = {
@@ -74,7 +77,7 @@ def all_pages(q):
         'apprefix': q,
     }
     ret = api_get(params)
-    return [i['title'] for i in ret['query']['allpages'] if i['title'] != q]
+    return [i['title'] for i in ret['allpages'] if i['title'] != q]
 
 def categorymembers(q):
     params = {
@@ -85,7 +88,7 @@ def categorymembers(q):
     }
     ret = api_get(params)
     return [i['title']
-            for i in ret['query']['categorymembers']
+            for i in ret['categorymembers']
             if i['title'] != q]
 
 def page_links(titles):  # unused
@@ -99,7 +102,7 @@ def page_links(titles):  # unused
     }
     ret = api_get(params)
     return dict((doc['title'], {l['title'] for l in doc['links']})
-                for doc in ret['query']['pages'].values() if 'links' in doc)
+                for doc in ret['pages'].values() if 'links' in doc)
 
 def find_disambig(titles):
     titles = list(titles)
@@ -115,7 +118,7 @@ def find_disambig(titles):
     while pos < len(titles):
         params['titles'] = '|'.join(titles[pos:pos + 50])
         ret = api_get(params)
-        disambig.extend(doc['title'] for doc in ret['query']['pages'] if is_disambig(doc))
+        disambig.extend(doc['title'] for doc in ret['pages'] if is_disambig(doc))
         for i in range(3):
             if 'continue' not in ret:
                 break
@@ -123,7 +126,7 @@ def find_disambig(titles):
             params['titles'] = '|'.join(titles[pos:pos + 50])
             params['tlcontinue'] = tlcontinue
             ret = api_get(params)
-            disambig.extend(doc['title'] for doc in ret['query']['pages'] if is_disambig(doc))
+            disambig.extend(doc['title'] for doc in ret['pages'] if is_disambig(doc))
         pos += 50
 
     return disambig
@@ -136,7 +139,7 @@ def wiki_redirects(q):  # pages that link here
         'blnamespace': 0,
         'bltitle': q,
     }
-    docs = api_get(params)['query']['backlinks']
+    docs = api_get(params)['backlinks']
     assert all('redirect' in doc for doc in docs)
     return (doc['title'] for doc in docs)
 
@@ -149,11 +152,11 @@ def wiki_backlink(q):
         'continue': '',
     }
     ret = api_get(params)
-    docs = ret['query']['backlinks']
+    docs = ret['backlinks']
     while 'continue' in ret:
         params['blcontinue'] = ret['continue']['blcontinue']
         ret = api_get(params)
-        docs += ret['query']['backlinks']
+        docs += ret['backlinks']
 
     articles = {doc['title'] for doc in docs if 'redirect' not in doc}
     redirects = {doc['title'] for doc in docs if 'redirect' in doc}
@@ -169,4 +172,4 @@ def call_get_diff(title, section_num, section_text):
     }
 
     ret = s.post(query_url, data=data).json()
-    return ret['query']['pages'][0]['revisions'][0]['diff']['body']
+    return ret['pages'][0]['revisions'][0]['diff']['body']
