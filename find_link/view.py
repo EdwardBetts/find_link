@@ -1,5 +1,5 @@
 from __future__ import unicode_literals
-import urllib
+import urllib.parse
 from .api import Missing, wiki_redirects, get_wiki_info, api_get
 from .util import urlquote, case_flip_first, wiki_space_norm
 from .core import do_search, get_content_and_timestamp
@@ -7,26 +7,11 @@ from .match import NoMatch, find_link_in_content, get_diff
 from flask import Blueprint, Markup, redirect, request, url_for, render_template, current_app
 from datetime import datetime
 from cProfile import Profile
-from functools import wraps
-from werkzeug.debug.tbtools import get_current_traceback
 
 bp = Blueprint('view', __name__)
 
 def init_app(app):
     app.register_blueprint(bp)
-
-def show_errors(f):
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        try:
-            return f(*args, **kwargs)
-        except Exception:
-            if current_app.debug:
-                raise
-            traceback = get_current_traceback(skip=1, show_hidden_frames=False,
-                                              ignore_system_exceptions=True)
-            return traceback.render_full().encode('utf-8', 'replace')
-    return wrapper
 
 def get_page(title, q, linkto=None):
     content, timestamp = get_content_and_timestamp(title)
@@ -45,7 +30,6 @@ def get_page(title, q, linkto=None):
                            summary=summary, timestamp=timestamp)
 
 @bp.route('/diff')
-@show_errors
 def diff_view():
     q = request.args.get('q')
     title = request.args.get('title')
@@ -61,7 +45,7 @@ def diff_view():
 @bp.route("/<path:q>")
 def findlink(q, title=None, message=None):
     if q and '%' in q:  # double encoding
-        q = urllib.unquote(q)
+        q = urllib.parse.unquote(q)
     q_trim = q.strip('_')
     if not message and (' ' in q or q != q_trim):
         return redirect(url_for('.findlink', q=q.replace(' ', '_').strip('_'),
@@ -141,5 +125,3 @@ def index():
     if q:
         return redirect(url_for('.findlink', q=q.replace(' ', '_').strip('_')))
     return render_template('index.html')
-
-
