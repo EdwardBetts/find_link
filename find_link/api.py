@@ -18,10 +18,10 @@ class Missing (Exception):
     pass
 
 def api_get(params):
-    return s.get(query_url, params=params).json()['query']
+    return s.get(query_url, params=params).json()
 
 def get_first_page(params):
-    return api_get(params)['pages'][0]
+    return api_get(params)['query']['pages'][0]
 
 def wiki_search(q):
     params = {
@@ -32,14 +32,15 @@ def wiki_search(q):
         'continue': '',
     }
     ret = api_get(params)
-    totalhits = ret['searchinfo']['totalhits']
-    results = ret['search']
-    for i in range(3):
+    query = ret['query']
+    totalhits = query['searchinfo']['totalhits']
+    results = query['search']
+    for i in range(10):
         if 'continue' not in ret:
             break
         params['sroffset'] = ret['continue']['sroffset']
         ret = api_get(params)
-        results += ret['search']
+        results += ret['query']['search']
     return (totalhits, results)
 
 def get_wiki_info(q):
@@ -48,10 +49,12 @@ def get_wiki_info(q):
         'redirects': '',
         'titles': q,
     }
-    ret = api_get(params)
+    ret = api_get(params)['query']
     redirects = []
     if ret.get('redirects'):
         redirects = ret['redirects']
+        if len(redirects) != 1:
+            print(redirects)
         assert len(redirects) == 1
     if 'missing' in ret['pages'][0]:
         raise Missing
@@ -65,7 +68,7 @@ def cat_start(q):
         'aplimit': 500,
         'apprefix': q,
     }
-    ret = api_get(params)
+    ret = api_get(params)['query']
     return [i['title'] for i in ret['allpages'] if i['title'] != q]
 
 def all_pages(q):
@@ -76,7 +79,7 @@ def all_pages(q):
         'aplimit': 500,
         'apprefix': q,
     }
-    ret = api_get(params)
+    ret = api_get(params)['query']
     return [i['title'] for i in ret['allpages'] if i['title'] != q]
 
 def categorymembers(q):
@@ -86,7 +89,7 @@ def categorymembers(q):
         'cmlimit': 500,
         'cmtitle': q[0].upper() + q[1:],
     }
-    ret = api_get(params)
+    ret = api_get(params)['query']
     return [i['title']
             for i in ret['categorymembers']
             if i['title'] != q]
@@ -100,7 +103,7 @@ def page_links(titles):  # unused
         'plnamespace': 0,
         'titles': '|'.join(titles)
     }
-    ret = api_get(params)
+    ret = api_get(params)['query']
     return dict((doc['title'], {l['title'] for l in doc['links']})
                 for doc in ret['pages'].values() if 'links' in doc)
 
@@ -118,15 +121,15 @@ def find_disambig(titles):
     while pos < len(titles):
         params['titles'] = '|'.join(titles[pos:pos + 50])
         ret = api_get(params)
-        disambig.extend(doc['title'] for doc in ret['pages'] if is_disambig(doc))
-        for i in range(3):
+        disambig.extend(doc['title'] for doc in ret['query']['pages'] if is_disambig(doc))
+        for i in range(10):
             if 'continue' not in ret:
                 break
             tlcontinue = ret['continue']['tlcontinue']
             params['titles'] = '|'.join(titles[pos:pos + 50])
             params['tlcontinue'] = tlcontinue
             ret = api_get(params)
-            disambig.extend(doc['title'] for doc in ret['pages'] if is_disambig(doc))
+            disambig.extend(doc['title'] for doc in ret['query']['pages'] if is_disambig(doc))
         pos += 50
 
     return disambig
@@ -152,11 +155,11 @@ def wiki_backlink(q):
         'continue': '',
     }
     ret = api_get(params)
-    docs = ret['backlinks']
+    docs = ret['query']['backlinks']
     while 'continue' in ret:
         params['blcontinue'] = ret['continue']['blcontinue']
         ret = api_get(params)
-        docs += ret['backlinks']
+        docs += ret['query']['backlinks']
 
     articles = {doc['title'] for doc in docs if 'redirect' not in doc}
     redirects = {doc['title'] for doc in docs if 'redirect' in doc}
@@ -172,4 +175,4 @@ def call_get_diff(title, section_num, section_text):
     }
 
     ret = s.post(query_url, data=data).json()
-    return ret['pages'][0]['revisions'][0]['diff']['body']
+    return ret['query']['pages'][0]['revisions'][0]['diff']['body']
