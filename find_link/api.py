@@ -1,8 +1,10 @@
 import requests
+import re
 from requests.adapters import HTTPAdapter
 from .util import strip_parens, is_disambig
 
 ua = "find-link/2.2 (https://github.com/EdwardBetts/find_link; contact: edward@4angle.com)"
+re_disambig = re.compile(r'^(.*) \((.*)\)$')
 
 s = requests.Session()
 s.headers = {'User-Agent': ua}
@@ -24,11 +26,17 @@ def get_first_page(params):
     return api_get(params)['query']['pages'][0]
 
 def wiki_search(q):
+    m = re_disambig.match(q)
+    if m:
+        search = '"{}" AND "{}"'.format(*m.groups())
+    else:
+        search = '"{}"'.format(q)
+
     params = {
         'list': 'search',
         'srwhat': 'text',
         'srlimit': 50,
-        'srsearch': u'"{}"'.format(strip_parens(q)),
+        'srsearch': search,
         'continue': '',
     }
     ret = api_get(params)
