@@ -1,7 +1,7 @@
 from __future__ import unicode_literals
 from .util import is_title_case, lc_alpha
 from .core import get_content_and_timestamp, get_case_from_content
-from .api import get_wiki_info, call_get_diff
+from .api import get_wiki_info, call_get_diff, MissingPage
 import re
 
 re_link_in_text = re.compile(r'\[\[[^]]+?\]\]', re.I | re.S)
@@ -154,7 +154,10 @@ def find_link_in_chunk(q, content, linkto=None):
                     if q in link_text and len(link_text) > len(q):
                         bad_link_match = True
                 if bad_link_match and link_dest:
-                    link_dest_redirect = get_wiki_info(link_dest)
+                    try:
+                        link_dest_redirect = get_wiki_info(link_dest)
+                    except MissingPage:
+                        link_dest_redirect = None
                     if link_dest_redirect and lc_alpha(link_dest_redirect) == lc_alpha_q:
                         bad_link_match = False
                 if not bad_link_match:

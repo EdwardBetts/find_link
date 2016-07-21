@@ -1,6 +1,8 @@
 import requests
 from requests.adapters import HTTPAdapter
 from .util import strip_parens, is_disambig
+from time import sleep
+from simplejson.scanner import JSONDecodeError
 
 ua = "find-link/2.2 (https://github.com/EdwardBetts/find_link; contact: edward@4angle.com)"
 
@@ -14,17 +16,31 @@ s.params = {
     'formatversion': 2,
 }
 
-class Missing(Exception):
-    pass
-
 class IncompleteReply(Exception):
     pass
 
-def api_get(params):
-    return s.get(query_url, params=params).json()
+class BadTitle(Exception):
+    pass
+
+class MissingPage(Exception):
+    pass
+
+def api_get(params, attempts=5):
+    def do_get(params):
+        return s.get(query_url, params=params).json()
+    for attempt in range(attempts):
+        try:
+            return do_get(params)
+        except JSONDecodeError:
+            pass  # retry
+        sleep(0.5)
+    return do_get(params)
 
 def get_first_page(params):
-    return api_get(params)['query']['pages'][0]
+    page = api_get(params)['query']['pages'][0]
+    if page.get('missing'):
+        raise MissingPage
+    return page
 
 def wiki_search(q):
     params = {
@@ -59,8 +75,8 @@ def get_wiki_info(q):
         if len(redirects) != 1:
             print(redirects)
         assert len(redirects) == 1
-    if 'missing' in ret['pages'][0]:
-        raise Missing
+    if ret['pages'][0].get('missing'):
+        raise MissingPage(q)
     return redirects[0]['to'] if redirects else None
 
 def cat_start(q):
@@ -145,7 +161,7 @@ def wiki_redirects(q):  # pages that link here
         'blnamespace': 0,
         'bltitle': q,
     }
-    docs = api_get(params)['backlinks']
+    docs = api_get(params)['query']['backlinks']
     assert all('redirect' in doc for doc in docs)
     return (doc['title'] for doc in docs)
 
@@ -158,6 +174,9 @@ def wiki_backlink(q):
         'continue': '',
     }
     ret = api_get(params)
+    if 'error' in ret:
+        if ret['error']['code'] == 'blinvalidtitle':
+            raise BadTitle
     docs = ret['query']['backlinks']
     while 'continue' in ret:
         params['blcontinue'] = ret['continue']['blcontinue']

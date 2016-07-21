@@ -7,7 +7,8 @@ re_space_or_dash = re.compile('[ -]')
 def is_title_case(phrase):
     '''Detected if a given phrase is in Title Case.'''
     return all(term[0].isupper() and term[1:].islower()
-               for term in re_space_or_dash.split(phrase))
+               for term in re_space_or_dash.split(phrase)
+               if term and term[0].isalpha())
 
 def urlquote(value):
     '''prepare string for use in URL param'''

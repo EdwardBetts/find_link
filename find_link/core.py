@@ -105,7 +105,7 @@ def do_search(q, redirect_to):
         articles.update(a2)
         redirects.update(r2)
 
-    longer = find_longer(q, search, articles)
+    longer = find_longer(q, search, articles) if len(q) > 6 else None
 
     search = [doc for doc in search
               if doc['title'] not in articles and doc['title'] not in cm]

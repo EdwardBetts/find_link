@@ -1,6 +1,6 @@
 from __future__ import unicode_literals
 import urllib.parse
-from .api import Missing, wiki_redirects, get_wiki_info, api_get
+from .api import wiki_redirects, get_wiki_info, api_get, BadTitle, MissingPage
 from .util import urlquote, case_flip_first, wiki_space_norm
 from .core import do_search, get_content_and_timestamp
 from .match import NoMatch, find_link_in_content, get_diff, LinkReplace
@@ -35,6 +35,9 @@ def diff_view():
     title = request.args.get('title')
     linkto = request.args.get('linkto')
 
+    if not q or not title:
+        return redirect(url_for('.index'))
+
     try:
         diff, replacement = get_diff(q, title, linkto)
     except NoMatch:
@@ -54,7 +57,7 @@ def findlink(q, title=None, message=None):
 
     try:
         redirect_to = get_wiki_info(q)
-    except Missing:
+    except MissingPage:
         return render_template('index.html', message=q + " isn't an article")
     # if redirect_to:
     #     return redirect(url_for('findlink', q=redirect_to.replace(' ', '_')))
@@ -66,7 +69,10 @@ def findlink(q, title=None, message=None):
 
     # profile
     p = Profile()
-    ret = p.runcall(do_search, q, redirect_to)
+    try:
+        ret = p.runcall(do_search, q, redirect_to)
+    except BadTitle:
+        return 'bad title'
 
     for doc in ret['results']:
         doc['snippet'] = Markup(doc['snippet'])
@@ -115,6 +121,9 @@ def link_replace(title, q, linkto=None):
                            diff=diff,
                            replacement=replacement)
 
+def missing_page(title, q, linkto=None):
+    return render_template('missing_page.html', title=title, q=q)
+
 @bp.route("/")
 def index():
     title = request.args.get('title')
@@ -129,6 +138,8 @@ def index():
             reply = get_page(title, q, linkto)
         except LinkReplace:
             return link_replace(title, q, linkto)
+        except MissingPage:
+            return missing_page(title, q, linkto)
         if reply:
             return reply
         redirects = list(wiki_redirects(q))
