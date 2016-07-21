@@ -17,11 +17,11 @@ trans2 = {' ': r"('?s?\]\])?'?s? ?(\[\[(?:.+\|)?)?", '-': '[- ]'}
 trans2[en_dash] = trans2[' ']
 
 patterns = [
-    lambda q: re.compile(r'(?<!-)(?:\[\[(?:[^]]+\|)?)?(%s)%s(?:\]\])?' % (q[0], ''.join('-?' + trans2.get(c, c) for c in q[1:])), re.I),
-    lambda q: re.compile(r'(?<!-)\[\[[^|]+\|(%s)%s\]\]' % (q[0], q[1:]), re.I),
-    lambda q: re.compile(r'(?<!-)\[\[[^|]+\|(%s)%s(?:\]\])?' % (q[0], ''.join('-?' + trans2.get(c, c) for c in q[1:])), re.I),
-    lambda q: re.compile(r'(?<!-)(%s)%s' % (q[0], q[1:]), re.I),
-    lambda q: re.compile(r'(?<!-)(%s)%s' % (q[0], ''.join(trans.get(c, c) for c in q[1:])), re.I),
+    lambda q: re.compile(r'(?<!-)(?:\[\[(?:[^]]+\|)?)?(%s)%s(?:\]\])?' % (re.escape(q[0]), ''.join('-?' + (trans2[c] if c in trans2 else re.escape(c)) for c in q[1:])), re.I),
+    lambda q: re.compile(r'(?<!-)\[\[[^|]+\|(%s)%s\]\]' % (re.escape(q[0]), re.escape(q[1:])), re.I),
+    lambda q: re.compile(r'(?<!-)\[\[[^|]+\|(%s)%s(?:\]\])?' % (re.escape(q[0]), ''.join('-?' + (trans2[c] if c in trans2 else re.escape(c)) for c in q[1:])), re.I),
+    lambda q: re.compile(r'(?<!-)(%s)%s' % (re.escape(q[0]), re.escape(q[1:])), re.I),
+    lambda q: re.compile(r'(?<!-)(%s)%s' % (re.escape(q[0]), ''.join((trans[c] if c in trans else re.escape(c)) for c in q[1:])), re.I),
 ]
 
 class NoMatch(Exception):
