@@ -1,10 +1,10 @@
 from __future__ import unicode_literals
 import urllib.parse
 from .api import wiki_redirects, get_wiki_info, api_get, BadTitle, MissingPage
-from .util import urlquote, case_flip_first, wiki_space_norm
+from .util import urlquote, case_flip_first, wiki_space_norm, starts_with_namespace
 from .core import do_search, get_content_and_timestamp
 from .match import NoMatch, find_link_in_content, get_diff, LinkReplace
-from flask import Blueprint, Markup, redirect, request, url_for, render_template, current_app
+from flask import Blueprint, Markup, redirect, request, url_for, render_template
 from datetime import datetime
 from cProfile import Profile
 
@@ -54,6 +54,10 @@ def findlink(q, title=None, message=None):
         return redirect(url_for('.findlink', q=q.replace(' ', '_').strip('_'),
                         message=message))
     q = q.replace('_', ' ').strip()
+
+    if starts_with_namespace(q):
+        return render_template('index.html',
+                               message="'{}' isn't in the article namespace".format(q))
 
     try:
         redirect_to = get_wiki_info(q)
