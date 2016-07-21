@@ -3,6 +3,16 @@ import urllib
 
 # util functions that don't access the network
 
+namespaces = {ns.casefold() for ns in ('Special', 'Media', 'Talk', 'Template',
+              'Portal', 'Portal talk', 'Book', 'Book talk', 'Template talk',
+              'Draft', 'Draft talk', 'Help', 'Help talk',
+              'Category', 'Category talk', 'User', 'Gadget', 'Gadget talk',
+              'Gadget definition', 'Gadget definition talk', 'Topic',
+              'User talk', 'Wikipedia',
+              'Education Program', 'Education Program talk', 'Wikipedia talk',
+              'File', 'File talk', 'TimedText', 'TimedText talk', 'MediaWiki',
+              'Module', 'Module talk', 'MediaWiki talk')}
+
 re_space_or_dash = re.compile('[ -]')
 def is_title_case(phrase):
     '''Detected if a given phrase is in Title Case.'''
@@ -17,6 +27,9 @@ re_end_parens = re.compile(r' \(.*\)$')
 def strip_parens(q):
     m = re_end_parens.search(q)
     return q[:m.start()] if m else q
+
+def starts_with_namespace(title):
+    return ':' in title and title.split(':', 1)[0].casefold() in namespaces
 
 def is_disambig(doc):
     '''Is a this a disambiguation page?'''
