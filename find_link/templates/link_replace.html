@@ -1,0 +1,52 @@
+<html>
+<head>
+<title>{{ title }} &ndash; link to {{ q }}</title>
+<link rel="shortcut icon" href="{{url_for('static', filename='Link_edit.png')}}" />
+
+<style>
+body {
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+span.exact { padding: 2px; background: green; color: white; font-weight: bold; }
+span.nomatch { padding: 2px; background: red; color: white; font-weight: bold; }
+span.case_mismatch { padding: 2px; background: orange; color: white; font-weight: bold; }
+span.searchmatch { font-weight: bold; }
+.flash { font-weight: bold; }
+
+table.diff,td.diff-otitle,td.diff-ntitle{background-color:white}
+td.diff-otitle,td.diff-ntitle{text-align:center}
+td.diff-marker{text-align:right;font-weight:bold;font-size:1.25em}
+td.diff-lineno{font-weight:bold}
+td.diff-addedline,td.diff-deletedline,td.diff-context{font-size:88%;vertical-align:top;white-space:-moz-pre-wrap;white-space:pre-wrap}
+td.diff-addedline,td.diff-deletedline{border-style:solid;border-width:1px 1px 1px 4px;border-radius:0.33em}
+td.diff-addedline{border-color:#a3d3ff}
+td.diff-deletedline{border-color:#ffe49c}
+td.diff-context{background:#f3f3f3;color:#333333;border-style:solid;border-width:1px 1px 1px 4px;border-color:#e6e6e6;border-radius:0.33em}
+.diffchange{font-weight:bold;text-decoration:none}
+table.diff{border:none;width:98%;border-spacing:4px; table-layout:fixed}
+td.diff-addedline .diffchange,td.diff-deletedline .diffchange{border-radius:0.33em;padding:0.25em 0}
+td.diff-addedline .diffchange{background:#d8ecff}
+td.diff-deletedline .diffchange{background:#feeec8}
+table.diff td{padding:0.33em 0.66em}
+table.diff col.diff-marker{width:2%}
+table.diff col.diff-content{width:48%}
+table.diff td div{ word-wrap:break-word; overflow:auto}
+
+</style>
+</head>
+<body>
+
+<h1>{{ title }} &ndash; link to {{ q }}</h1>
+
+<ul>
+<li>article: <a href="http://en.wikipedia.org/wiki/{{ title }}">{{ title }}</a></li>
+<li>adding link: <a href="http://en.wikipedia.org/wiki/{{ q }}">{{ q }}</a></li>
+</ul>
+
+<p>It is not possible to add the new link because it would replace an existing, longer link.</p>
+
+<table>{{ diff | safe }}</table>
+
+</body>
+</html>

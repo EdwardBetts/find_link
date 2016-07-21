@@ -16,7 +16,10 @@ s.params = {
     'formatversion': 2,
 }
 
-class Missing (Exception):
+class Missing(Exception):
+    pass
+
+class IncompleteReply(Exception):
     pass
 
 def api_get(params):

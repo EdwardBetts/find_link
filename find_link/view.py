@@ -3,7 +3,7 @@ import urllib.parse
 from .api import Missing, wiki_redirects, get_wiki_info, api_get
 from .util import urlquote, case_flip_first, wiki_space_norm, starts_with_namespace
 from .core import do_search, get_content_and_timestamp
-from .match import NoMatch, find_link_in_content, get_diff
+from .match import NoMatch, find_link_in_content, get_diff, LinkReplace
 from flask import Blueprint, Markup, redirect, request, url_for, render_template
 from datetime import datetime
 from cProfile import Profile
@@ -106,6 +106,19 @@ def newpages():
 def bad_url(q):
     return findlink(q)
 
+def link_replace(title, q, linkto=None):
+    try:
+        diff, replacement = get_diff(q, title, linkto)
+    except NoMatch:
+        diff = "can't generate diff"
+        replacement = None
+
+    return render_template('link_replace.html',
+                           title=title,
+                           q=q,
+                           diff=diff,
+                           replacement=replacement)
+
 @bp.route("/")
 def index():
     title = request.args.get('title')
@@ -116,7 +129,10 @@ def index():
         title = wiki_space_norm(title)
         if linkto:
             linkto = wiki_space_norm(linkto)
-        reply = get_page(title, q, linkto)
+        try:
+            reply = get_page(title, q, linkto)
+        except LinkReplace:
+            return link_replace(title, q, linkto)
         if reply:
             return reply
         redirects = list(wiki_redirects(q))
