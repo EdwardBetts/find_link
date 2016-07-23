@@ -2,7 +2,7 @@ from __future__ import unicode_literals
 import urllib.parse
 from .api import wiki_redirects, get_wiki_info, api_get, BadTitle, MissingPage
 from .util import urlquote, case_flip_first, wiki_space_norm, starts_with_namespace
-from .core import do_search, get_content_and_timestamp
+from .core import do_search, get_content_and_timestamp, MediawikiError
 from .match import NoMatch, find_link_in_content, get_diff, LinkReplace
 from flask import Blueprint, Markup, redirect, request, url_for, render_template
 from datetime import datetime
@@ -134,12 +134,18 @@ def index():
     q = request.args.get('q')
     linkto = request.args.get('linkto')
     if title and q:
+        if len(title) > 255:
+            return findlink(q.replace(' ', '_'), title=title,
+                            message='title too long: "{}"'.format(title))
+
         q = wiki_space_norm(q)
         title = wiki_space_norm(title)
         if linkto:
             linkto = wiki_space_norm(linkto)
         try:
             reply = get_page(title, q, linkto)
+        except MediawikiError as e:
+            return findlink(q.replace(' ', '_'), title=title, message=e.args[0])
         except LinkReplace:
             return link_replace(title, q, linkto)
         except MissingPage:

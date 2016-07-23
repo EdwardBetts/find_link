@@ -6,13 +6,19 @@ import re
 
 re_redirect = re.compile(r'#REDIRECT \[\[(.)([^#]*?)(#.*)?\]\]')
 
+class MediawikiError(Exception):
+    pass
+
 def get_content_and_timestamp(title):
     params = {
         'prop': 'revisions|info',
         'rvprop': 'content|timestamp',
         'titles': title,
     }
-    rev = get_first_page(params)['revisions'][0]
+    json_data = get_first_page(params)
+    if json_data.get('invalid'):
+        raise MediawikiError(json_data['invalidreason'])
+    rev = json_data['revisions'][0]
     return (rev['content'], rev['timestamp'])
 
 def is_redirect_to(title_from, title_to):
