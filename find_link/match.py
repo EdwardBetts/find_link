@@ -175,7 +175,7 @@ def find_link_in_chunk(q, content, linkto=None):
                 m_end = m.end()
                 re_extend = re.compile(m.re.pattern + r'\w*\b', re.I)
                 m = re_extend.search(content)
-                if m.end() > m_end:
+                if m and m.end() > m_end:
                     replacement += content[m_end:m.end()]
                     new_content = add_link(m, replacement, content)
     return (new_content, replacement)
