@@ -18,6 +18,9 @@ s.params = {
     'formatversion': 2,
 }
 
+class MediawikiError(Exception):
+    pass
+
 class IncompleteReply(Exception):
     pass
 
@@ -59,6 +62,8 @@ def wiki_search(q):
         'continue': '',
     }
     ret = api_get(params)
+    if 'error' in ret:
+        raise MediawikiError(ret['error']['info'])
     query = ret['query']
     totalhits = query['searchinfo']['totalhits']
     results = query['search']
@@ -169,7 +174,10 @@ def wiki_redirects(q):  # pages that link here
         'blnamespace': 0,
         'bltitle': q,
     }
-    docs = api_get(params)['query']['backlinks']
+    json_data = api_get(params)
+    if 'error' in json_data:
+        raise MediawikiError(json_data['error']['info'])
+    docs = json_data['query']['backlinks']
     assert all('redirect' in doc for doc in docs)
     return (doc['title'] for doc in docs)
 

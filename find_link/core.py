@@ -1,13 +1,11 @@
 from __future__ import unicode_literals
 from .util import norm, case_flip_first
 from .api import (cat_start, categorymembers, find_disambig,
-                  wiki_search, all_pages, wiki_backlink, get_first_page, api_get)
+                  wiki_search, all_pages, wiki_backlink, get_first_page,
+                  api_get, MediawikiError)
 import re
 
 re_redirect = re.compile(r'#REDIRECT \[\[(.)([^#]*?)(#.*)?\]\]')
-
-class MediawikiError(Exception):
-    pass
 
 def get_content_and_timestamp(title):
     params = {

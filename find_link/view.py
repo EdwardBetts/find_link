@@ -77,6 +77,8 @@ def findlink(q, title=None, message=None):
         ret = p.runcall(do_search, q, redirect_to)
     except BadTitle:
         return 'bad title'
+    except MediawikiError as e:
+        return e.args[0]
 
     for doc in ret['results']:
         doc['snippet'] = Markup(doc['snippet'])
@@ -152,7 +154,10 @@ def index():
             return missing_page(title, q, linkto)
         if reply:
             return reply
-        redirects = list(wiki_redirects(q))
+        try:
+            redirects = list(wiki_redirects(q))
+        except MediawikiError as e:
+            return findlink(q.replace(' ', '_'), title=title, message=e.args[0])
         for r in redirects:
             reply = get_page(title, r, linkto=q)
             if reply:
