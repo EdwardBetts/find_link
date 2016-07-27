@@ -35,6 +35,7 @@ def api_get(params, attempts=5):
     def do_get(params):
         ret = s.get(query_url, params=params).json()
         check_for_error(ret)
+        return ret
     for attempt in range(attempts):
         try:
             return do_get(params)
