@@ -42,9 +42,14 @@ re_heading = re.compile(r'^\s*(=+)\s*(.+)\s*\1(<!--.*-->|\s)*$')
 def section_iter(text):
     cur_section = ''
     heading = None
+    in_comment = False
     for line in text.splitlines(True):
+        if '<!--' in line:
+            in_comment = True
+        if '-->' in line:
+            in_comment = False
         m = re_heading.match(line)
-        if not m:
+        if in_comment or not m:
             cur_section += line
             continue
         if cur_section or heading:
