@@ -1,8 +1,8 @@
 from __future__ import unicode_literals
 import urllib.parse
-from .api import wiki_redirects, get_wiki_info, api_get, BadTitle, MissingPage
+from .api import wiki_redirects, get_wiki_info, api_get, MissingPage, MediawikiError
 from .util import urlquote, case_flip_first, wiki_space_norm, starts_with_namespace
-from .core import do_search, get_content_and_timestamp, MediawikiError
+from .core import do_search, get_content_and_timestamp
 from .match import NoMatch, find_link_in_content, get_diff, LinkReplace
 from flask import Blueprint, Markup, redirect, request, url_for, render_template
 from datetime import datetime
@@ -75,8 +75,6 @@ def findlink(q, title=None, message=None):
     p = Profile()
     try:
         ret = p.runcall(do_search, q, redirect_to)
-    except BadTitle:
-        return 'bad title'
     except MediawikiError as e:
         return e.args[0]
 
@@ -119,6 +117,9 @@ def link_replace(title, q, linkto=None):
         diff, replacement = get_diff(q, title, linkto)
     except NoMatch:
         diff = "can't generate diff"
+        replacement = None
+    except MediawikiError as e:
+        diff = e.args[0]
         replacement = None
 
     return render_template('link_replace.html',

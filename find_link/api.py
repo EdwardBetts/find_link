@@ -24,15 +24,17 @@ class MediawikiError(Exception):
 class IncompleteReply(Exception):
     pass
 
-class BadTitle(Exception):
-    pass
-
 class MissingPage(Exception):
     pass
 
+def check_for_error(json_data):
+    if 'error' in json_data:
+        raise MediawikiError(json_data['error']['info'])
+
 def api_get(params, attempts=5):
     def do_get(params):
-        return s.get(query_url, params=params).json()
+        ret = s.get(query_url, params=params).json()
+        check_for_error(ret)
     for attempt in range(attempts):
         try:
             return do_get(params)
@@ -62,8 +64,6 @@ def wiki_search(q):
         'continue': '',
     }
     ret = api_get(params)
-    if 'error' in ret:
-        raise MediawikiError(ret['error']['info'])
     query = ret['query']
     totalhits = query['searchinfo']['totalhits']
     results = query['search']
@@ -174,10 +174,7 @@ def wiki_redirects(q):  # pages that link here
         'blnamespace': 0,
         'bltitle': q,
     }
-    json_data = api_get(params)
-    if 'error' in json_data:
-        raise MediawikiError(json_data['error']['info'])
-    docs = json_data['query']['backlinks']
+    docs = api_get(params)['query']['backlinks']
     assert all('redirect' in doc for doc in docs)
     return (doc['title'] for doc in docs)
 
@@ -190,9 +187,6 @@ def wiki_backlink(q):
         'continue': '',
     }
     ret = api_get(params)
-    if 'error' in ret:
-        if ret['error']['code'] == 'blinvalidtitle':
-            raise BadTitle
     docs = ret['query']['backlinks']
     while 'continue' in ret:
         params['blcontinue'] = ret['continue']['blcontinue']
@@ -213,4 +207,5 @@ def call_get_diff(title, section_num, section_text):
     }
 
     ret = s.post(query_url, data=data).json()
+    check_for_error(ret)
     return ret['query']['pages'][0]['revisions'][0]['diff']['body']
