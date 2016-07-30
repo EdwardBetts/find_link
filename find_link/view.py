@@ -1,6 +1,6 @@
 from __future__ import unicode_literals
 import urllib.parse
-from .api import wiki_redirects, get_wiki_info, api_get, MissingPage, MediawikiError
+from .api import wiki_redirects, get_wiki_info, api_get, MissingPage, MediawikiError, MultipleRedirects
 from .util import urlquote, case_flip_first, wiki_space_norm, starts_with_namespace
 from .core import do_search, get_content_and_timestamp
 from .match import NoMatch, find_link_in_content, get_diff, LinkReplace
@@ -63,6 +63,8 @@ def findlink(q, title=None, message=None):
         redirect_to = get_wiki_info(q)
     except MissingPage:
         return render_template('index.html', message=q + " isn't an article")
+    except MultipleRedirects:
+        return render_template('index.html', message=q + " is a redirect to a redirect, this isn't supported")
     # if redirect_to:
     #     return redirect(url_for('findlink', q=redirect_to.replace(' ', '_')))
     if redirect_to:

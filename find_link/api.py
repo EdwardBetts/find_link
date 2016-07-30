@@ -21,6 +21,9 @@ s.params = {
 class MediawikiError(Exception):
     pass
 
+class MultipleRedirects(Exception):
+    pass
+
 class IncompleteReply(Exception):
     pass
 
@@ -87,8 +90,9 @@ def get_wiki_info(q):
     if ret.get('redirects'):
         redirects = ret['redirects']
         if len(redirects) != 1:
-            print(redirects)
-        assert len(redirects) == 1
+            # multiple redirects, we should explain to the user that this is
+            # unsupported
+            raise MultipleRedirects
     if ret['pages'][0].get('missing'):
         raise MissingPage(q)
     return redirects[0]['to'] if redirects else None
