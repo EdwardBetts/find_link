@@ -86,6 +86,8 @@ def get_wiki_info(q):
         'titles': q,
     }
     ret = api_get(params)['query']
+    if 'interwiki' in ret:
+        return None
     redirects = []
     if ret.get('redirects'):
         redirects = ret['redirects']

@@ -21,6 +21,8 @@ def get_page(title, q, linkto=None):
         (content, replacement) = find_link_in_content(q, content, linkto)
     except NoMatch:
         return None
+    except LinkReplace:
+        return link_replace(title, q, linkto)
 
     summary = "link [[%s]] using [[User:Edward/Find link|Find link]]" % replacement
 
