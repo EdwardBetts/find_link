@@ -4,8 +4,8 @@ from logging import Formatter
 
 class MySMTPHandler(SMTPHandler):
     def getSubject(self, record):
-        if record.exc_info:
-            return 'find_link error: {}'.format(record.exc_info[0])
+        if record.exc_info and record.exc_info[0]:
+            return 'find_link error: {}'.format(record.exc_info[0].__name__)
         return 'find_link error: {}:{:d}'.format(record.pathname,
                                                  record.lineno)
 
