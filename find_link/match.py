@@ -151,7 +151,7 @@ def find_link_in_chunk(q, content, linkto=None):
             if '|' in link_text:
                 link_dest, link_text = link_text.split('|', 1)
             m = search_for_link(link_text)
-            if m:
+            if m and not link_dest.startswith('#'):
                 lc_alpha_q = lc_alpha(q)
 
                 bad_link_match = link_dest and len(link_dest) > len(q) and (lc_alpha_q not in lc_alpha(link_dest))
