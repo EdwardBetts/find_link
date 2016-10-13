@@ -1,22 +1,33 @@
 import requests
 import re
 from requests.adapters import HTTPAdapter
-from .util import strip_parens, is_disambig
+from .util import is_disambig
+from .language import get_current_language
 from time import sleep
 from simplejson.scanner import JSONDecodeError
 
 ua = "find-link/2.2 (https://github.com/EdwardBetts/find_link; contact: edward@4angle.com)"
 re_disambig = re.compile(r'^(.*) \((.*)\)$')
 
-s = requests.Session()
-s.headers = {'User-Agent': ua}
-query_url = 'https://en.wikipedia.org/w/api.php'
-s.mount('https://en.wikipedia.org', HTTPAdapter(max_retries=10))
-s.params = {
-    'format': 'json',
-    'action': 'query',
-    'formatversion': 2,
-}
+def get_query_url():
+    lang = get_current_language()
+    return 'https://{}.wikipedia.org/w/api.php'.format(lang)
+
+sessions = {}
+def get_session():
+    lang = get_current_language()
+    if lang in sessions:
+        return sessions[lang]
+    s = requests.Session()
+    s.headers = {'User-Agent': ua}
+    s.mount('https://en.wikipedia.org', HTTPAdapter(max_retries=10))
+    s.params = {
+        'format': 'json',
+        'action': 'query',
+        'formatversion': 2,
+    }
+    sessions[lang] = s
+    return s
 
 class MediawikiError(Exception):
     pass
@@ -35,8 +46,10 @@ def check_for_error(json_data):
         raise MediawikiError(json_data['error']['info'])
 
 def api_get(params, attempts=5):
+    s = get_session()
+
     def do_get(params):
-        ret = s.get(query_url, params=params).json()
+        ret = s.get(get_query_url(), params=params).json()
         check_for_error(ret)
         return ret
     for attempt in range(attempts):
@@ -213,6 +226,7 @@ def call_get_diff(title, section_num, section_text):
         'rvdifftotext': section_text.strip(),
     }
 
-    ret = s.post(query_url, data=data).json()
+    s = get_session()
+    ret = s.post(get_query_url(), data=data).json()
     check_for_error(ret)
     return ret['query']['pages'][0]['revisions'][0]['diff']['body']

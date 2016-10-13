@@ -1,0 +1,29 @@
+{% macro language_dropdown(langs, current_lang) %}
+<p>langauge: 
+<select id="language">
+{% for l in langs %}
+{% if l.code == current_lang -%}
+<option value="{{ l.code }}" selected="selected">
+{%- else -%}
+<option value="{{ l.code }}">
+{%- endif -%}
+{{ l.code }}: {{ l.local -}}
+{% if l.local != l.english %}
+    [{{ l.english }}]
+{%- endif %}
+</option>
+{% endfor %}
+</select>
+</p>
+
+<script>
+$(function() {
+    $('select').change(function(event) {
+        console.log('change');
+        code = $(this).val();
+        window.location.replace("{{ url_for('.set_lang', code='') }}" + code);
+    });
+});
+</script>
+
+{% endmacro %}

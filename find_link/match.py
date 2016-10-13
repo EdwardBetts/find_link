@@ -134,6 +134,7 @@ def find_link_in_chunk(q, content, linkto=None):
 
     match_in_non_link = False
     bad_link_match = False
+    found_text_to_link = None
 
     for token_type, text in parse_links(content):
         if token_type == 'text':
@@ -143,6 +144,7 @@ def find_link_in_chunk(q, content, linkto=None):
             before, sep, link_text = text[:-2].rpartition('|')
             m = search_for_link(link_text)
             if m:
+                found_text_to_link = m.group(0)
                 replacement = match_found(m, q, linkto)
                 text = before + sep + add_link(m, replacement, link_text) + ']]'
         elif token_type == 'link' and not replacement and not match_in_non_link:
@@ -151,7 +153,7 @@ def find_link_in_chunk(q, content, linkto=None):
             if '|' in link_text:
                 link_dest, link_text = link_text.split('|', 1)
             m = search_for_link(link_text)
-            if m and not link_dest.startswith('#'):
+            if m and (not link_dest or not link_dest.startswith('#')):
                 lc_alpha_q = lc_alpha(q)
 
                 bad_link_match = link_dest and len(link_dest) > len(q) and (lc_alpha_q not in lc_alpha(link_dest))
@@ -167,6 +169,7 @@ def find_link_in_chunk(q, content, linkto=None):
                         bad_link_match = False
                 if not bad_link_match:
                     replacement = match_found(m, q, linkto)
+                    found_text_to_link = m.group(0)
                     text = add_link(m, replacement, link_text)
         new_content += text
     if not replacement:
@@ -174,6 +177,7 @@ def find_link_in_chunk(q, content, linkto=None):
             raise LinkReplace
         m = search_for_link(content)
         if m:
+            found_text_to_link = m.group(0)
             replacement = match_found(m, q, linkto)
             new_content = add_link(m, replacement, content)
             if linkto:
@@ -183,7 +187,7 @@ def find_link_in_chunk(q, content, linkto=None):
                 if m and m.end() > m_end:
                     replacement += content[m_end:m.end()]
                     new_content = add_link(m, replacement, content)
-    return (new_content, replacement)
+    return (new_content, replacement, found_text_to_link)
 
 def find_link_in_text(q, content):
     (new_content, replacement) = find_link_in_chunk(q, content)
@@ -206,14 +210,14 @@ def find_link_in_content(q, content, linkto=None):
         for token_type, text in parse_cite(section_text):
             if token_type == 'text' and not replacement:
                 try:
-                    (new_text, replacement) = find_link_in_chunk(q, text, linkto=linkto)
+                    (new_text, replacement, replaced_text) = find_link_in_chunk(q, text, linkto=linkto)
                 except LinkReplace:
                     link_replace = True
                 if replacement:
                     text = new_text
             new_content += text
     if replacement:
-        return (new_content, replacement)
+        return (new_content, replacement, replaced_text)
     raise LinkReplace if link_replace else NoMatch
 
 def find_link_and_section(q, content, linkto=None):

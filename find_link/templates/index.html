@@ -53,18 +53,30 @@ table.diff td div{ word-wrap:break-word; overflow:auto}
 
 </style>
 </head>
+{% from "macros.html" import language_dropdown %}
 <body>
 <h1>Find link</h1>
 {% if message %}
-  <span class="flash">{{ message }}</span><br>
+  <span class="flash">{{ message }}</span><br/>
 {% endif %}
+
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    {% for message in messages %}
+      <span class="flash">{{ message }}</span><br/>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+{{ language_dropdown(langs, current_lang) }}
+
 <form class="well form-search" action="{{url_for('.index')}}">
 <input id="q" name="q" value="{{ q }}" size="60" class="input-medium search-query">
 <button type="submit" class="btn">Search</button>
 {% if q %}
     {% set esc_q = urlquote(q.replace(' ', '_')) %}
     <script>
-    api_url = 'http://en.wikipedia.org/w/api.php?format=json&callback=?&';
+    api_url = 'https://{{current_lang}}.wikipedia.org/w/api.php?format=json&callback=?&';
     function get_redirects () {
         url = api_url + "action=query&list=backlinks&blfilterredir=redirects&bllimit=500&blnamespace=0&bltitle={{esc_q}}";
         $.getJSON(url, function(data) {
@@ -78,7 +90,7 @@ table.diff td div{ word-wrap:break-word; overflow:auto}
         });
     });
     </script>
-    <a href="http://en.wikipedia.org/wiki/{{esc_q}}">view article</a>
+    <a href="http://{{current_lang}}.wikipedia.org/wiki/{{esc_q}}">view article</a>
 {% endif %}
 </form>
 
@@ -89,7 +101,7 @@ table.diff td div{ word-wrap:break-word; overflow:auto}
         Longer titles found:
         {% for t in longer_titles %}
             {% set esc_title = urlquote(t.replace(' ', '_')) %}
-            <a href="{{ url_for('.findlink', q=t.replace(' ', '_'))}}">{{t}}</a> (<a href="http://en.wikipedia.org/wiki/{{esc_title}}">view</a>){{ ',' if not loop.last }}
+            <a href="{{ url_for('.findlink', q=t.replace(' ', '_'))}}">{{t}}</a> (<a href="http://{{current_lang}}.wikipedia.org/wiki/{{esc_title}}">view</a>){{ ',' if not loop.last }}
         {% endfor %}<p>
     {% endif %}
     {% if redirect_to %}
@@ -122,7 +134,7 @@ table.diff td div{ word-wrap:break-word; overflow:auto}
         {% if doc.match == 'exact' %}<span class="exact">exact match in snippet</span>{% endif %}
         {% if doc.match == 'case_mismatch' %}<span class="case_mismatch">case mismatch in snippet</span>{% endif %}
         {% if not doc.match %}<span class="nomatch">no match in snippet</span>{% endif %}
-        <a href="http://en.wikipedia.org/wiki/{{esc_title}}" target="_blank">view article</a>
+        <a href="https://{{ current_lang }}.wikipedia.org/wiki/{{esc_title}}" target="_blank">view article</a>
         {% if '(' not in doc.title %}
             <a href="{{url_for('.findlink', q=doc.title.replace(' ', '_'))}}" target="_blank">find links to article</a>
         {% endif %}
@@ -137,7 +149,7 @@ $(function() {
     $( "#q" ).autocomplete({
       source: function( request, response ) {
         $.ajax({
-          url: "http://en.wikipedia.org/w/api.php",
+          url: "https://{{ current_lang }}.wikipedia.org/w/api.php",
           dataType: "jsonp",
           data: {
             action: 'query',
