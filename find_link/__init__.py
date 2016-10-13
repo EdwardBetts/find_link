@@ -6,7 +6,7 @@ from .error_mail import setup_error_mail
 class MyFlask(Flask):
     def log_exception(self, exc_info):
         self.logger.error("""
-Path:                 %s 
+Path:                 %s
 HTTP Method:          %s
 Client IP Address:    %s
 User Agent:           %s

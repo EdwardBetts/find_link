@@ -4,9 +4,10 @@ from .api import wiki_redirects, get_wiki_info, api_get, MissingPage, MediawikiE
 from .util import urlquote, case_flip_first, wiki_space_norm, starts_with_namespace
 from .core import do_search, get_content_and_timestamp
 from .match import NoMatch, find_link_in_content, get_diff, LinkReplace
-from flask import Blueprint, Markup, redirect, request, url_for, render_template
+from flask import Blueprint, Markup, redirect, request, url_for, render_template, session, flash
 from datetime import datetime
 from cProfile import Profile
+from .language import get_langs, get_current_language
 
 bp = Blueprint('view', __name__)
 
@@ -16,20 +17,22 @@ def init_app(app):
 def get_page(title, q, linkto=None):
     content, timestamp = get_content_and_timestamp(title)
     timestamp = ''.join(c for c in timestamp if c.isdigit())
+    current_lang = get_current_language()
 
     try:
-        (content, replacement) = find_link_in_content(q, content, linkto)
+        (content, replacement, replaced_text) = find_link_in_content(q, content, linkto)
     except NoMatch:
         return None
     except LinkReplace:
         return link_replace(title, q, linkto)
 
-    summary = "link [[%s]] using [[User:Edward/Find link|Find link]]" % replacement
+    summary = "link [[%s]] using [[:en:User:Edward/Find link|Find link]]" % replacement
 
     start_time = datetime.now().strftime("%Y%m%d%H%M%S")
     return render_template('find_link.html', urlquote=urlquote,
                            start_time=start_time, content=content, title=title,
-                           summary=summary, timestamp=timestamp)
+                           summary=summary, timestamp=timestamp,
+                           current_lang=current_lang)
 
 @bp.route('/diff')
 def diff_view():
@@ -49,6 +52,8 @@ def diff_view():
 
 @bp.route("/<path:q>")
 def findlink(q, title=None, message=None):
+    langs = get_langs()
+    current_lang = get_current_language()
     if q and '%' in q:  # double encoding
         q = urllib.parse.unquote(q)
     q_trim = q.strip('_')
@@ -59,14 +64,17 @@ def findlink(q, title=None, message=None):
 
     if starts_with_namespace(q):
         return render_template('index.html',
-                               message="'{}' isn't in the article namespace".format(q))
+                               message="'{}' isn't in the article namespace".format(q),
+                               langs=langs, current_lang=current_lang)
 
     try:
         redirect_to = get_wiki_info(q)
     except MissingPage:
-        return render_template('index.html', message=q + " isn't an article")
+        return render_template('index.html', message=q + " isn't an article",
+                               langs=langs, current_lang=current_lang)
     except MultipleRedirects:
-        return render_template('index.html', message=q + " is a redirect to a redirect, this isn't supported")
+        return render_template('index.html', message=q + " is a redirect to a redirect, this isn't supported",
+                               langs=langs, current_lang=current_lang)
     # if redirect_to:
     #     return redirect(url_for('findlink', q=redirect_to.replace(' ', '_')))
     if redirect_to:
@@ -94,7 +102,9 @@ def findlink(q, title=None, message=None):
         enumerate=enumerate,
         longer_titles=ret['longer'],
         redirect_to=redirect_to,
-        case_flip_first=case_flip_first)
+        case_flip_first=case_flip_first,
+        langs=langs,
+        current_lang=current_lang)
 
 @bp.route("/favicon.ico")
 def favicon():
@@ -117,6 +127,7 @@ def bad_url(q):
     return findlink(q)
 
 def link_replace(title, q, linkto=None):
+    current_lang = get_current_language()
     try:
         diff, replacement = get_diff(q, title, linkto)
     except NoMatch:
@@ -130,13 +141,28 @@ def link_replace(title, q, linkto=None):
                            title=title,
                            q=q,
                            diff=diff,
-                           replacement=replacement)
+                           replacement=replacement,
+                           current_lang=current_lang)
+
 
 def missing_page(title, q, linkto=None):
     return render_template('missing_page.html', title=title, q=q)
 
+@bp.route("/set_lang/<code>")
+def set_lang(code):
+    session['current_lang'] = code
+    flash('language updated')
+    return redirect(url_for('.index', lang=code))
+
 @bp.route("/")
 def index():
+    langs = get_langs()
+    valid_languages = {l['code'] for l in langs}
+    lang_arg = request.args.get('lang')
+    if lang_arg and lang_arg.strip().lower() in valid_languages:
+        session['current_lang'] = lang_arg.strip()
+
+    current_lang = get_current_language()
     title = request.args.get('title')
     q = request.args.get('q')
     linkto = request.args.get('linkto')
@@ -171,4 +197,6 @@ def index():
                         message=q + ' not in ' + title)
     if q:
         return redirect(url_for('.findlink', q=q.replace(' ', '_').strip('_')))
-    return render_template('index.html')
+    return render_template('index.html',
+                           langs=langs,
+                           current_lang=current_lang)
