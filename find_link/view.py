@@ -8,8 +8,11 @@ from flask import Blueprint, Markup, redirect, request, url_for, render_template
 from datetime import datetime
 from cProfile import Profile
 from .language import get_langs, get_current_language
+import re
 
 bp = Blueprint('view', __name__)
+
+re_lang = re.compile('^(' + '|'.join(l['code'] for l in get_langs()) + '):(.*)$')
 
 def init_app(app):
     app.register_blueprint(bp)
@@ -50,8 +53,16 @@ def diff_view():
 
     return '<table>' + diff + '</table>'
 
+def lang_from_q(q):
+    m = re_lang.match(q)
+    if not m:
+        return q
+    session['current_lang'] = m.group(1)
+    return m.group(2)
+
 @bp.route("/<path:q>")
 def findlink(q, title=None, message=None):
+    q = lang_from_q(q)
     langs = get_langs()
     current_lang = get_current_language()
     if q and '%' in q:  # double encoding
@@ -154,18 +165,26 @@ def set_lang(code):
     flash('language updated')
     return redirect(url_for('.index', lang=code))
 
-@bp.route("/")
-def index():
+def lang_from_request():
     langs = get_langs()
     valid_languages = {l['code'] for l in langs}
     lang_arg = request.args.get('lang')
     if lang_arg and lang_arg.strip().lower() in valid_languages:
         session['current_lang'] = lang_arg.strip()
 
-    current_lang = get_current_language()
+@bp.route("/")
+def index():
+    langs = get_langs()
     title = request.args.get('title')
     q = request.args.get('q')
     linkto = request.args.get('linkto')
+
+    if q and ':' in q:
+        q = lang_from_q(q)
+    else:
+        lang_from_request()
+    current_lang = get_current_language()
+
     if title and q:
         if len(title) > 255:
             return findlink(q.replace(' ', '_'), title=title,
