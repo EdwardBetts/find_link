@@ -1,4 +1,4 @@
-from flask import session
+from flask import session, has_request_context
 
 langs = [
     ('af', 'Afrikaans', 'Afrikaans'),
@@ -141,4 +141,4 @@ def get_langs():
     return [dict(zip(('code', 'local', 'english'), l)) for l in langs]
 
 def get_current_language():
-    return session.get('current_lang', 'en')
+    return session.get('current_lang', 'en') if has_request_context() else 'en'
