@@ -88,7 +88,7 @@ def findlink(q, title=None, message=None):
     try:
         ret = p.runcall(do_search, q, redirect_to)
     except MediawikiError as e:
-        return e.args[0]
+        return 'Mediawiki error: ' + e.args[0]
 
     for doc in ret['results']:
         doc['snippet'] = Markup(doc['snippet'])
@@ -166,35 +166,33 @@ def index():
     title = request.args.get('title')
     q = request.args.get('q')
     linkto = request.args.get('linkto')
-    if title and q:
-        if len(title) > 255:
-            return findlink(q.replace(' ', '_'), title=title,
-                            message='title too long: "{}"'.format(title))
+    try:
+        if title and q:
+            if len(title) > 255:
+                return findlink(q.replace(' ', '_'), title=title,
+                                message='title too long: "{}"'.format(title))
 
-        q = wiki_space_norm(q)
-        title = wiki_space_norm(title)
-        if linkto:
-            linkto = wiki_space_norm(linkto)
-        try:
-            reply = get_page(title, q, linkto)
-        except MediawikiError as e:
-            return findlink(q.replace(' ', '_'), title=title, message=e.args[0])
-        except LinkReplace:
-            return link_replace(title, q, linkto)
-        except MissingPage:
-            return missing_page(title, q, linkto)
-        if reply:
-            return reply
-        try:
-            redirects = list(wiki_redirects(q))
-        except MediawikiError as e:
-            return findlink(q.replace(' ', '_'), title=title, message=e.args[0])
-        for r in redirects:
-            reply = get_page(title, r, linkto=q)
+            q = wiki_space_norm(q)
+            title = wiki_space_norm(title)
+            if linkto:
+                linkto = wiki_space_norm(linkto)
+            try:
+                reply = get_page(title, q, linkto)
+            except LinkReplace:
+                return link_replace(title, q, linkto)
+            except MissingPage:
+                return missing_page(title, q, linkto)
             if reply:
                 return reply
-        return findlink(q.replace(' ', '_'), title=title,
-                        message=q + ' not in ' + title)
+            redirects = list(wiki_redirects(q))
+            for r in redirects:
+                reply = get_page(title, r, linkto=q)
+                if reply:
+                    return reply
+            return findlink(q.replace(' ', '_'), title=title,
+                            message=q + ' not in ' + title)
+    except MediawikiError as e:
+        return 'MediaWiki error: ' + e.args[0]
     if q:
         return redirect(url_for('.findlink', q=q.replace(' ', '_').strip('_')))
     return render_template('index.html',

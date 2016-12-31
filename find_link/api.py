@@ -45,20 +45,21 @@ def check_for_error(json_data):
     if 'error' in json_data:
         raise MediawikiError(json_data['error']['info'])
 
+webpage_error = 'Our servers are currently under maintenance or experiencing a technical problem.'
+
 def api_get(params, attempts=5):
     s = get_session()
 
-    def do_get(params):
-        ret = s.get(get_query_url(), params=params).json()
-        check_for_error(ret)
-        return ret
-    for attempt in range(attempts):
-        try:
-            return do_get(params)
-        except JSONDecodeError:
-            pass  # retry
-        sleep(0.5)
-    return do_get(params)
+    r = s.get(get_query_url(), params=params)
+    try:
+        ret = r.json()
+    except JSONDecodeError:
+        if webpage_error in r.text:
+            raise MediawikiError(webpage_error)
+        else:
+            raise MediawikiError('unknown error')
+    check_for_error(ret)
+    return ret
 
 def get_first_page(params):
     page = api_get(params)['query']['pages'][0]
