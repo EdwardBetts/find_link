@@ -60,9 +60,18 @@ def lang_from_q(q):
     session['current_lang'] = m.group(1)
     return m.group(2)
 
+def lang_from_request():
+    langs = get_langs()
+    valid_languages = {l['code'] for l in langs}
+    lang_arg = request.args.get('lang')
+    if lang_arg and lang_arg.strip().lower() in valid_languages:
+        session['current_lang'] = lang_arg.strip()
+
 @bp.route("/<path:q>")
 def findlink(q, title=None, message=None):
-    q = lang_from_q(q)
+    if ':' in q:
+        q = lang_from_q(q)
+    lang_from_request()
     langs = get_langs()
     current_lang = get_current_language()
     if q and '%' in q:  # double encoding
@@ -164,13 +173,6 @@ def set_lang(code):
     session['current_lang'] = code
     flash('language updated')
     return redirect(url_for('.index', lang=code))
-
-def lang_from_request():
-    langs = get_langs()
-    valid_languages = {l['code'] for l in langs}
-    lang_arg = request.args.get('lang')
-    if lang_arg and lang_arg.strip().lower() in valid_languages:
-        session['current_lang'] = lang_arg.strip()
 
 @bp.route("/")
 def index():
