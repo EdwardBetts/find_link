@@ -3,7 +3,6 @@ import re
 from requests.adapters import HTTPAdapter
 from .util import is_disambig
 from .language import get_current_language
-from time import sleep
 from simplejson.scanner import JSONDecodeError
 
 ua = "find-link/2.2 (https://github.com/EdwardBetts/find_link; contact: edward@4angle.com)"
@@ -12,6 +11,7 @@ re_disambig = re.compile(r'^(.*) \((.*)\)$')
 def get_query_url():
     lang = get_current_language()
     return 'https://{}.wikipedia.org/w/api.php'.format(lang)
+
 
 sessions = {}
 def get_session():
@@ -45,9 +45,10 @@ def check_for_error(json_data):
     if 'error' in json_data:
         raise MediawikiError(json_data['error']['info'])
 
+
 webpage_error = 'Our servers are currently under maintenance or experiencing a technical problem.'
 
-def api_get(params, attempts=5):
+def api_get(params):
     s = get_session()
 
     r = s.get(get_query_url(), params=params)

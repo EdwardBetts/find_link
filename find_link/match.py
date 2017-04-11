@@ -9,6 +9,7 @@ re_link_in_text = re.compile(r'\[\[[^]]+?\]\]', re.I | re.S)
 class LinkReplace(Exception):
     pass
 
+
 en_dash = u'\u2013'
 trans = {',': ',?', ' ': ' *[-\n]? *'}
 trans[en_dash] = trans[' ']
@@ -27,6 +28,7 @@ patterns = [
 class NoMatch(Exception):
     pass
 
+
 re_cite = re.compile(r'<ref( [^>]*?)?>\s*({{cite.*?}}|\[https?://[^]]*?\])\s*</ref>', re.I | re.S)
 
 def parse_cite(text):
@@ -36,6 +38,7 @@ def parse_cite(text):
         yield ('cite', m.group(0))
         prev = m.end()
     yield ('text', text[prev:])
+
 
 re_heading = re.compile(r'^\s*(=+)\s*(.+)\s*\1(<!--.*-->|\s)*$')
 

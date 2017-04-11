@@ -1,4 +1,3 @@
-from __future__ import unicode_literals
 from flask import Flask, request
 import find_link.view
 from .error_mail import setup_error_mail

@@ -24,6 +24,7 @@ def urlquote(value):
     '''prepare string for use in URL param'''
     return urllib.parse.quote_plus(value.encode('utf-8'))
 
+
 re_end_parens = re.compile(r' \(.*\)$')
 def strip_parens(q):
     m = re_end_parens.search(q)
@@ -37,6 +38,7 @@ def is_disambig(doc):
     return any('disambig' in t or t.endswith('dis') or 'given name' in t or
                t == 'template:surname' for t in
                (t['title'].lower() for t in doc.get('templates', [])))
+
 
 re_non_letter = re.compile('\W', re.U)
 def norm(s):
