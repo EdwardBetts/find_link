@@ -1,5 +1,6 @@
 from __future__ import unicode_literals
 import urllib.parse
+import html
 from .api import wiki_redirects, get_wiki_info, api_get, MissingPage, MediawikiError, MultipleRedirects
 from .util import urlquote, case_flip_first, wiki_space_norm, starts_with_namespace
 from .core import do_search, get_content_and_timestamp
@@ -108,7 +109,7 @@ def findlink(q, title=None, message=None):
     try:
         ret = p.runcall(do_search, q, redirect_to)
     except MediawikiError as e:
-        return 'Mediawiki error: ' + e.args[0]
+        return 'Mediawiki error: ' + html.escape(e.args[0])
 
     for doc in ret['results']:
         doc['snippet'] = Markup(doc['snippet'])
