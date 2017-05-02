@@ -9,7 +9,6 @@ from flask import Blueprint, Markup, redirect, request, url_for, render_template
 from datetime import datetime
 from cProfile import Profile
 from .language import get_langs, get_current_language
-from .lock import Lock
 import re
 
 bp = Blueprint('view', __name__)
@@ -41,20 +40,19 @@ def get_page(title, q, linkto=None):
 
 @bp.route('/diff')
 def diff_view():
-    with Lock('find_link'):
-        q = request.args.get('q')
-        title = request.args.get('title')
-        linkto = request.args.get('linkto')
+    q = request.args.get('q')
+    title = request.args.get('title')
+    linkto = request.args.get('linkto')
 
-        if not q or not title:
-            return redirect(url_for('.index'))
+    if not q or not title:
+        return redirect(url_for('.index'))
 
-        try:
-            diff, replacement = get_diff(q, title, linkto)
-        except NoMatch:
-            return "can't generate diff"
+    try:
+        diff, replacement = get_diff(q, title, linkto)
+    except NoMatch:
+        return "can't generate diff"
 
-        return '<table>' + diff + '</table>'
+    return '<table>' + diff + '</table>'
 
 def lang_from_q(q):
     m = re_lang.match(q)
@@ -72,63 +70,62 @@ def lang_from_request():
 
 @bp.route("/<path:q>")
 def findlink(q, title=None, message=None):
-    with Lock('find_link'):
-        if ':' in q:
-            q = lang_from_q(q)
-        lang_from_request()
-        langs = get_langs()
-        current_lang = get_current_language()
-        if q and '%' in q:  # double encoding
-            q = urllib.parse.unquote(q)
-        q_trim = q.strip('_')
-        if not message and (' ' in q or q != q_trim):
-            return redirect(url_for('.findlink', q=q.replace(' ', '_').strip('_'),
-                            message=message))
-        q = q.replace('_', ' ').strip()
+    if ':' in q:
+        q = lang_from_q(q)
+    lang_from_request()
+    langs = get_langs()
+    current_lang = get_current_language()
+    if q and '%' in q:  # double encoding
+        q = urllib.parse.unquote(q)
+    q_trim = q.strip('_')
+    if not message and (' ' in q or q != q_trim):
+        return redirect(url_for('.findlink', q=q.replace(' ', '_').strip('_'),
+                        message=message))
+    q = q.replace('_', ' ').strip()
 
-        if starts_with_namespace(q):
-            return render_template('index.html',
-                                   message="'{}' isn't in the article namespace".format(q),
-                                   langs=langs, current_lang=current_lang)
+    if starts_with_namespace(q):
+        return render_template('index.html',
+                               message="'{}' isn't in the article namespace".format(q),
+                               langs=langs, current_lang=current_lang)
 
-        try:
-            redirect_to = get_wiki_info(q)
-        except MissingPage:
-            return render_template('index.html', message=q + " isn't an article",
-                                   langs=langs, current_lang=current_lang)
-        except MultipleRedirects:
-            return render_template('index.html', message=q + " is a redirect to a redirect, this isn't supported",
-                                   langs=langs, current_lang=current_lang)
-        # if redirect_to:
-        #     return redirect(url_for('findlink', q=redirect_to.replace(' ', '_')))
-        if redirect_to:
-            if q[0].isupper():
-                redirect_to = redirect_to[0].upper() + redirect_to[1:]
-            elif q[0].islower():
-                redirect_to = redirect_to[0].lower() + redirect_to[1:]
+    try:
+        redirect_to = get_wiki_info(q)
+    except MissingPage:
+        return render_template('index.html', message=q + " isn't an article",
+                               langs=langs, current_lang=current_lang)
+    except MultipleRedirects:
+        return render_template('index.html', message=q + " is a redirect to a redirect, this isn't supported",
+                               langs=langs, current_lang=current_lang)
+    # if redirect_to:
+    #     return redirect(url_for('findlink', q=redirect_to.replace(' ', '_')))
+    if redirect_to:
+        if q[0].isupper():
+            redirect_to = redirect_to[0].upper() + redirect_to[1:]
+        elif q[0].islower():
+            redirect_to = redirect_to[0].lower() + redirect_to[1:]
 
-        # profile
-        p = Profile()
-        try:
-            ret = p.runcall(do_search, q, redirect_to)
-        except MediawikiError as e:
-            return 'Mediawiki error: ' + html.escape(e.args[0])
+    # profile
+    p = Profile()
+    try:
+        ret = p.runcall(do_search, q, redirect_to)
+    except MediawikiError as e:
+        return 'Mediawiki error: ' + html.escape(e.args[0])
 
-        for doc in ret['results']:
-            doc['snippet'] = Markup(doc['snippet'])
+    for doc in ret['results']:
+        doc['snippet'] = Markup(doc['snippet'])
 
-        return render_template('index.html', q=q,
-            totalhits=ret['totalhits'],
-            message=message,
-            results=ret['results'],
-            urlquote=urlquote,
-            str=str,
-            enumerate=enumerate,
-            longer_titles=ret['longer'],
-            redirect_to=redirect_to,
-            case_flip_first=case_flip_first,
-            langs=langs,
-            current_lang=current_lang)
+    return render_template('index.html', q=q,
+        totalhits=ret['totalhits'],
+        message=message,
+        results=ret['results'],
+        urlquote=urlquote,
+        str=str,
+        enumerate=enumerate,
+        longer_titles=ret['longer'],
+        redirect_to=redirect_to,
+        case_flip_first=case_flip_first,
+        langs=langs,
+        current_lang=current_lang)
 
 @bp.route("/favicon.ico")
 def favicon():
@@ -180,48 +177,47 @@ def set_lang(code):
 
 @bp.route("/")
 def index():
-    with Lock('find_link'):
-        langs = get_langs()
-        title = request.args.get('title')
-        q = request.args.get('q')
-        linkto = request.args.get('linkto')
+    langs = get_langs()
+    title = request.args.get('title')
+    q = request.args.get('q')
+    linkto = request.args.get('linkto')
 
-        if q and ':' in q:
-            q = lang_from_q(q)
-        else:
-            lang_from_request()
-        current_lang = get_current_language()
+    if q and ':' in q:
+        q = lang_from_q(q)
+    else:
+        lang_from_request()
+    current_lang = get_current_language()
 
-        try:
-            if title and q:
-                if len(title) > 255:
-                    return findlink(q.replace(' ', '_'), title=title,
-                                    message='title too long: "{}"'.format(title))
+    try:
+        if title and q:
+            if len(title) > 255:
+                return findlink(q.replace(' ', '_'), title=title,
+                                message='title too long: "{}"'.format(title))
 
-                q = wiki_space_norm(q)
-                title = wiki_space_norm(title)
-                if linkto:
-                    linkto = wiki_space_norm(linkto)
-                try:
-                    reply = get_page(title, q, linkto)
-                except LinkReplace:
-                    return link_replace(title, q, linkto)
-                except MissingPage:
-                    return missing_page(title, q, linkto)
+            q = wiki_space_norm(q)
+            title = wiki_space_norm(title)
+            if linkto:
+                linkto = wiki_space_norm(linkto)
+            try:
+                reply = get_page(title, q, linkto)
+            except LinkReplace:
+                return link_replace(title, q, linkto)
+            except MissingPage:
+                return missing_page(title, q, linkto)
 
+            if reply:
+                return reply
+            redirects = list(wiki_redirects(q))
+            for r in redirects:
+                reply = get_page(title, r, linkto=q)
                 if reply:
                     return reply
-                redirects = list(wiki_redirects(q))
-                for r in redirects:
-                    reply = get_page(title, r, linkto=q)
-                    if reply:
-                        return reply
-                return findlink(q.replace(' ', '_'), title=title,
-                                message=q + ' not in ' + title)
-        except MediawikiError as e:
-            return 'MediaWiki error: ' + e.args[0]
-        if q:
-            return redirect(url_for('.findlink', q=q.replace(' ', '_').strip('_')))
-        return render_template('index.html',
-                               langs=langs,
-                               current_lang=current_lang)
+            return findlink(q.replace(' ', '_'), title=title,
+                            message=q + ' not in ' + title)
+    except MediawikiError as e:
+        return 'MediaWiki error: ' + e.args[0]
+    if q:
+        return redirect(url_for('.findlink', q=q.replace(' ', '_').strip('_')))
+    return render_template('index.html',
+                           langs=langs,
+                           current_lang=current_lang)
