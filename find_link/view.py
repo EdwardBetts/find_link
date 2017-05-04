@@ -7,7 +7,6 @@ from .core import do_search, get_content_and_timestamp
 from .match import NoMatch, find_link_in_content, get_diff, LinkReplace
 from flask import Blueprint, Markup, redirect, request, url_for, render_template, session, flash
 from datetime import datetime
-from cProfile import Profile
 from .language import get_langs, get_current_language
 import re
 
@@ -96,6 +95,9 @@ def findlink(q, title=None, message=None):
     except MultipleRedirects:
         return render_template('index.html', message=q + " is a redirect to a redirect, this isn't supported",
                                langs=langs, current_lang=current_lang)
+    except MediawikiError as e:
+        return 'Mediawiki error: ' + html.escape(e.args[0])
+
     # if redirect_to:
     #     return redirect(url_for('findlink', q=redirect_to.replace(' ', '_')))
     if redirect_to:
@@ -104,10 +106,8 @@ def findlink(q, title=None, message=None):
         elif q[0].islower():
             redirect_to = redirect_to[0].lower() + redirect_to[1:]
 
-    # profile
-    p = Profile()
     try:
-        ret = p.runcall(do_search, q, redirect_to)
+        ret = do_search(q, redirect_to)
     except MediawikiError as e:
         return 'Mediawiki error: ' + html.escape(e.args[0])
 
