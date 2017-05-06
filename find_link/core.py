@@ -91,7 +91,10 @@ def do_search(q, redirect_to):
     totalhits, search = wiki_search(q)
     articles, redirects = wiki_backlink(redirect_to or q)
     cm = set()
-    for cat in set(['Category:' + this_title] + cat_start(q)):
+    start = cat_start(q)
+    if len(start) > 5:
+        start = []  # big categories take too long
+    for cat in set(['Category:' + this_title] + start):
         cm.update(categorymembers(cat))
 
     norm_q = norm(q)
