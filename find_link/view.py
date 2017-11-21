@@ -87,8 +87,9 @@ def findlink(q, title=None, message=None):
                                message="'{}' isn't in the article namespace".format(q),
                                langs=langs, current_lang=current_lang)
 
+    check_redirect = not request.args.get('ignore_redirect')
     try:
-        redirect_to = get_wiki_info(q)
+        redirect_to = get_wiki_info(q) if check_redirect else None
     except MissingPage:
         return render_template('index.html', message=q + " isn't an article",
                                langs=langs, current_lang=current_lang)
