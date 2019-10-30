@@ -86,7 +86,7 @@ def wiki_search(q):
     query = ret['query']
     totalhits = query['searchinfo']['totalhits']
     results = query['search']
-    for i in range(10):
+    for _ in range(10):
         if 'continue' not in ret:
             break
         params['sroffset'] = ret['continue']['sroffset']
