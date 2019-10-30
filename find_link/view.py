@@ -1,7 +1,7 @@
 from __future__ import unicode_literals
 import urllib.parse
 import html
-from .api import wiki_redirects, get_wiki_info, api_get, MissingPage, MediawikiError, MultipleRedirects
+from .api import wiki_redirects, get_wiki_info, api_get, MissingPage, MediawikiError, MultipleRedirects, random_article_list
 from .util import urlquote, case_flip_first, wiki_space_norm, starts_with_namespace
 from .core import do_search, get_content_and_timestamp
 from .match import NoMatch, find_link_in_content, get_diff, LinkReplace
@@ -36,6 +36,16 @@ def get_page(title, q, linkto=None):
                            start_time=start_time, content=content, title=title,
                            summary=summary, timestamp=timestamp,
                            current_lang=current_lang)
+
+@bp.route('/random')
+def random_article():
+    while True:
+        random_list = random_article_list()
+        for article in random_list:
+            title = article['title']
+            ret = do_search(title, None)
+            if ret['results']:
+                return redirect(url_for('.findlink', q=title))
 
 @bp.route('/diff')
 def diff_view():

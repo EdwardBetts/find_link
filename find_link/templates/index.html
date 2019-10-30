@@ -70,6 +70,10 @@ table.diff td div{ word-wrap:break-word; overflow:auto}
 
 {{ language_dropdown(langs, current_lang) }}
 
+<p>
+<a href="{{ url_for('.random_article')}}">jump to random article</a>
+</p>
+
 <form class="well form-search" action="{{url_for('.index')}}">
 <input id="q" name="q" value="{{ q }}" size="60" class="input-medium search-query">
 <button type="submit" class="btn">Search</button>

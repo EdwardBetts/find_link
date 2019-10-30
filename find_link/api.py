@@ -68,6 +68,15 @@ def get_first_page(params):
         raise MissingPage
     return page
 
+def random_article_list(limit=50):
+    params = {
+        'list': 'random',
+        'rnnamespace': '0',
+        'rnlimit': limit,
+    }
+
+    return api_get(params)['query']['random']
+
 def wiki_search(q):
     m = re_disambig.match(q)
     if m:
