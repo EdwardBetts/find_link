@@ -188,6 +188,9 @@ def set_lang(code):
 
 @bp.route("/")
 def index():
+    if 'oauth_verifier' in request.args and 'oauth_token' in request.args:
+        return redirect(b'http://localhost:8000/?' + request.query_string)
+
     langs = get_langs()
     title = request.args.get('title')
     q = request.args.get('q')
