@@ -4,6 +4,7 @@ from .api import (cat_start, categorymembers, find_disambig,
                   wiki_search, all_pages, wiki_backlink, get_first_page,
                   api_get, MediawikiError)
 import re
+import html
 
 re_redirect = re.compile(r'#REDIRECT \[\[(.)([^#]*?)(#.*)?\]\]')
 
@@ -72,6 +73,8 @@ def match_type(q, snippet):
     snippet = snippet.replace(u'\u2013', '-')
     snippet = snippet.replace(u'</span>', '')
     snippet = snippet.replace(u'<span class="searchmatch">', '')
+    snippet = html.unescape(snippet)
+
     if q in snippet or case_flip_first(q) in snippet:
         return 'exact'
     match = None
