@@ -1,55 +1,67 @@
 from __future__ import unicode_literals
 from .util import norm, case_flip_first
-from .api import (cat_start, categorymembers, find_disambig,
-                  wiki_search, all_pages, wiki_backlink, get_first_page,
-                  api_get, MediawikiError)
+from .api import (
+    cat_start,
+    categorymembers,
+    find_disambig,
+    wiki_search,
+    all_pages,
+    wiki_backlink,
+    get_first_page,
+    api_get,
+    MediawikiError,
+)
 import re
 import html
 
-re_redirect = re.compile(r'#REDIRECT \[\[(.)([^#]*?)(#.*)?\]\]')
+re_redirect = re.compile(r"#REDIRECT \[\[(.)([^#]*?)(#.*)?\]\]")
+
 
 def get_content_and_timestamp(title):
     params = {
-        'prop': 'revisions|info',
-        'rvprop': 'content|timestamp',
-        'titles': title,
+        "prop": "revisions|info",
+        "rvprop": "content|timestamp",
+        "titles": title,
     }
     json_data = get_first_page(params)
-    if json_data.get('invalid'):
-        raise MediawikiError(json_data['invalidreason'])
-    rev = json_data['revisions'][0]
-    return (rev['content'], rev['timestamp'])
+    if json_data.get("invalid"):
+        raise MediawikiError(json_data["invalidreason"])
+    rev = json_data["revisions"][0]
+    return (rev["content"], rev["timestamp"])
+
 
 def is_redirect_to(title_from, title_to):
-    title_from = title_from.replace('_', ' ')
-    params = {'prop': 'info', 'titles': title_from}
-    if 'redirect' not in get_first_page(params):
+    title_from = title_from.replace("_", " ")
+    params = {"prop": "info", "titles": title_from}
+    if "redirect" not in get_first_page(params):
         return False
 
-    params = {'prop': 'revisions', 'rvprop': 'content', 'titles': title_from}
-    page_text = get_first_page(params)['revisions'][0]['content']
+    params = {"prop": "revisions", "rvprop": "content", "titles": title_from}
+    page_text = get_first_page(params)["revisions"][0]["content"]
     m = re_redirect.match(page_text)
     title_to = title_to[0].upper() + title_to[1:]
     return m.group(1).upper() + m.group(2) == title_to
+
 
 def find_longer(q, search, articles):
     this_title = q[0].upper() + q[1:]
     longer = all_pages(this_title)
     lq = q.lower()
     for doc in search:
-        lt = doc['title'].lower()
+        lt = doc["title"].lower()
         if lq == lt or lq not in lt:
             continue
-        articles.add(doc['title'])
-        more_articles, more_redirects = wiki_backlink(doc['title'])
+        articles.add(doc["title"])
+        more_articles, more_redirects = wiki_backlink(doc["title"])
         articles.update(more_articles)
-        if doc['title'] not in longer:
-            longer.append(doc['title'])
+        if doc["title"] not in longer:
+            longer.append(doc["title"])
 
     return longer
 
+
 def match_type(q, snippet):
-    '''Discover match type, ''exact', 'case_mismatch' or None.
+    """Discover match type, ''exact', 'case_mismatch' or None.
 
     >>> match_type('foo', 'foo')
     'exact'
@@ -67,26 +79,27 @@ def match_type(q, snippet):
     'exact'
     >>> match_type(u'foo\u2013bar', 'aa foo-bar cc')
     'exact'
-    '''
+    """
 
-    q = q.replace(u'\u2013', '-')
-    snippet = snippet.replace(u'\u2013', '-')
-    snippet = snippet.replace(u'</span>', '')
-    snippet = snippet.replace(u'<span class="searchmatch">', '')
+    q = q.replace("\u2013", "-")
+    snippet = snippet.replace("\u2013", "-")
+    snippet = snippet.replace("</span>", "")
+    snippet = snippet.replace('<span class="searchmatch">', "")
     snippet = html.unescape(snippet)
 
     if q in snippet or case_flip_first(q) in snippet:
-        return 'exact'
+        return "exact"
     match = None
     if q.lower() in snippet.lower():
-        match = 'case_mismatch'
-    if match != 'exact' and q.endswith('y'):
+        match = "case_mismatch"
+    if match != "exact" and q.endswith("y"):
         if q[:-1] in snippet or case_flip_first(q[:-1]) in snippet:
-            return 'exact'
+            return "exact"
     elif match is None:
         if q[:-1].lower() in snippet.lower():
-            match = 'case_mismatch'
+            match = "case_mismatch"
     return match
+
 
 def do_search(q, redirect_to):
     this_title = q[0].upper() + q[1:]
@@ -97,7 +110,7 @@ def do_search(q, redirect_to):
     start = cat_start(q)
     if len(start) > 5:
         start = []  # big categories take too long
-    for cat in set(['Category:' + this_title] + start):
+    for cat in set(["Category:" + this_title] + start):
         cm.update(categorymembers(cat))
 
     norm_q = norm(q)
@@ -117,26 +130,33 @@ def do_search(q, redirect_to):
 
     longer = find_longer(q, search, articles) if len(q) > 6 else None
 
-    search = [doc for doc in search
-              if doc['title'] not in articles and doc['title'] not in cm]
+    search = [
+        doc for doc in search if doc["title"] not in articles and doc["title"] not in cm
+    ]
     if search:
-        disambig = set(find_disambig([doc['title'] for doc in search]))
-        search = [doc for doc in search if doc['title'] not in disambig]
-    # and (doc['title'] not in links or this_title not in links[doc['title']])]
+        disambig = set(find_disambig([doc["title"] for doc in search]))
+        search = [doc for doc in search if doc["title"] not in disambig]
+        # and (doc['title'] not in links or this_title not in links[doc['title']])]
         for doc in search:
-            without_markup = doc['snippet'].replace("<span class='searchmatch'>", "").replace("</span>", "").replace('  ', ' ')
-            doc['match'] = match_type(q, without_markup)
-            doc['snippet_without_markup'] = without_markup
+            without_markup = (
+                doc["snippet"]
+                .replace("<span class='searchmatch'>", "")
+                .replace("</span>", "")
+                .replace("  ", " ")
+            )
+            doc["match"] = match_type(q, without_markup)
+            doc["snippet_without_markup"] = without_markup
     return {
-        'totalhits': totalhits,
-        'results': search,
-        'longer': longer,
+        "totalhits": totalhits,
+        "results": search,
+        "longer": longer,
     }
+
 
 def get_case_from_content(title):
     content, timestamp = get_content_and_timestamp(title)
     if title == title.lower() and title in content:
         return title
-    start = content.lower().find("'''" + title.replace('_', ' ').lower() + "'''")
+    start = content.lower().find("'''" + title.replace("_", " ").lower() + "'''")
     if start != -1:
-        return content[start + 3:start + 3 + len(title)]
+        return content[start + 3 : start + 3 + len(title)]
