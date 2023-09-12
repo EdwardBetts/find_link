@@ -1,17 +1,23 @@
-import requests
 import re
+from typing import Any
+
+import requests
 from requests.adapters import HTTPAdapter
-from .util import is_disambig
-from .language import get_current_language
 from simplejson.scanner import JSONDecodeError
 
-ua = "find-link/2.2 (https://github.com/EdwardBetts/find_link; contact: edward@4angle.com)"
+from .language import get_current_language
+from .util import is_disambig
+
+ua = (
+    "find-link/2.2 "
+    + "(https://github.com/EdwardBetts/find_link; contact: edward@4angle.com)"
+)
 re_disambig = re.compile(r"^(.*) \((.*)\)$")
 
 
-def get_query_url():
-    lang = get_current_language()
-    return "https://{}.wikipedia.org/w/api.php".format(lang)
+def get_query_url() -> str:
+    """Get the wikipedia query API for the current language."""
+    return f"https://{get_current_language()}.wikipedia.org/w/api.php"
 
 
 sessions = {}
@@ -59,7 +65,8 @@ webpage_error = (
 )
 
 
-def api_get(params):
+def api_get(params: dict[str, Any]) -> dict[str, Any]:
+    """Make call to Wikipedia API."""
     s = get_session()
 
     r = s.get(get_query_url(), params=params)
@@ -74,7 +81,8 @@ def api_get(params):
     return ret
 
 
-def get_first_page(params):
+def get_first_page(params: dict[str, str]) -> dict[str, Any]:
+    """Run Wikipedia API query and return the first page."""
     page = api_get(params)["query"]["pages"][0]
     if page.get("missing"):
         raise MissingPage
@@ -139,7 +147,8 @@ def get_wiki_info(q):
     return redirects[0]["to"] if redirects else None
 
 
-def cat_start(q):
+def cat_start(q: str) -> list[str]:
+    """Find categories that start with this prefix."""
     params = {
         "list": "allpages",
         "apnamespace": 14,  # categories
@@ -151,7 +160,8 @@ def cat_start(q):
     return [i["title"] for i in ret["allpages"] if i["title"] != q]
 
 
-def all_pages(q):
+def all_pages(q: str) -> list[str]:
+    """Get all article titles with a given prefix."""
     params = {
         "list": "allpages",
         "apnamespace": 0,
@@ -163,7 +173,8 @@ def all_pages(q):
     return [i["title"] for i in ret["allpages"] if i["title"] != q]
 
 
-def categorymembers(q):
+def categorymembers(q: str) -> list[str]:
+    """List of category members."""
     params = {
         "list": "categorymembers",
         "cmnamespace": 0,
@@ -191,11 +202,12 @@ def page_links(titles):  # unused
     )
 
 
-def find_disambig(titles):
+def find_disambig(titles: list[str]) -> list[str]:
+    """Find disambiguation articles in the given list of titles."""
     titles = list(titles)
     assert titles
     pos = 0
-    disambig = []
+    disambig: list[str] = []
     params = {
         "prop": "templates",
         "tllimit": 500,
@@ -236,7 +248,8 @@ def wiki_redirects(q):  # pages that link here
     return (doc["title"] for doc in docs)
 
 
-def wiki_backlink(q):
+def wiki_backlink(q: str) -> tuple[set[str], set[str]]:
+    """Get backlinks for article."""
     params = {
         "list": "backlinks",
         "bllimit": 500,

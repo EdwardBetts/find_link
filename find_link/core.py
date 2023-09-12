@@ -1,36 +1,39 @@
-from __future__ import unicode_literals
-from .util import norm, case_flip_first
+"""Core functions."""
+
+import html
+import re
+from typing import Any
+
 from .api import (
+    MediawikiError,
+    all_pages,
     cat_start,
     categorymembers,
     find_disambig,
-    wiki_search,
-    all_pages,
-    wiki_backlink,
     get_first_page,
-    api_get,
-    MediawikiError,
+    wiki_backlink,
+    wiki_search,
 )
-import re
-import html
+from .util import case_flip_first, norm
 
 re_redirect = re.compile(r"#REDIRECT \[\[(.)([^#]*?)(#.*)?\]\]")
 
 
-def get_content_and_timestamp(title):
+def get_content_and_timestamp(title: str) -> tuple[str, str]:
+    """Get article content and timestamp of last update."""
     params = {
         "prop": "revisions|info",
         "rvprop": "content|timestamp",
         "titles": title,
     }
-    json_data = get_first_page(params)
+    json_data: dict[str, Any] = get_first_page(params)
     if json_data.get("invalid"):
         raise MediawikiError(json_data["invalidreason"])
     rev = json_data["revisions"][0]
     return (rev["content"], rev["timestamp"])
 
 
-def is_redirect_to(title_from, title_to):
+def is_redirect_to(title_from: str, title_to: str) -> bool:
     title_from = title_from.replace("_", " ")
     params = {"prop": "info", "titles": title_from}
     if "redirect" not in get_first_page(params):
@@ -39,13 +42,15 @@ def is_redirect_to(title_from, title_to):
     params = {"prop": "revisions", "rvprop": "content", "titles": title_from}
     page_text = get_first_page(params)["revisions"][0]["content"]
     m = re_redirect.match(page_text)
+    assert m
     title_to = title_to[0].upper() + title_to[1:]
     return m.group(1).upper() + m.group(2) == title_to
 
 
-def find_longer(q, search, articles):
+def find_longer(q: str, search: list[dict[str, Any]], articles: set[str]) -> list[str]:
+    """Find other articles with titles that are longer."""
     this_title = q[0].upper() + q[1:]
-    longer = all_pages(this_title)
+    longer: list[str] = all_pages(this_title)
     lq = q.lower()
     for doc in search:
         lt = doc["title"].lower()
@@ -60,7 +65,15 @@ def find_longer(q, search, articles):
     return longer
 
 
-def match_type(q, snippet):
+def tidy_snippet(snippet: str) -> str:
+    """Remove HTML from snippet."""
+    snippet = snippet.replace("\u2013", "-")
+    snippet = snippet.replace("</span>", "")
+    snippet = snippet.replace('<span class="searchmatch">', "")
+    return html.unescape(snippet)
+
+
+def match_type(q: str, snippet: str) -> str | None:
     """Discover match type, ''exact', 'case_mismatch' or None.
 
     >>> match_type('foo', 'foo')
@@ -80,12 +93,8 @@ def match_type(q, snippet):
     >>> match_type(u'foo\u2013bar', 'aa foo-bar cc')
     'exact'
     """
-
     q = q.replace("\u2013", "-")
-    snippet = snippet.replace("\u2013", "-")
-    snippet = snippet.replace("</span>", "")
-    snippet = snippet.replace('<span class="searchmatch">', "")
-    snippet = html.unescape(snippet)
+    snippet = tidy_snippet(snippet)
 
     if q in snippet or case_flip_first(q) in snippet:
         return "exact"
@@ -101,7 +110,7 @@ def match_type(q, snippet):
     return match
 
 
-def do_search(q, redirect_to):
+def do_search(q: str, redirect_to: str) -> dict[str, Any]:
     this_title = q[0].upper() + q[1:]
 
     totalhits, search = wiki_search(q)
@@ -153,10 +162,13 @@ def do_search(q, redirect_to):
     }
 
 
-def get_case_from_content(title):
+def get_case_from_content(title: str) -> str | None:
+    """Check article content to find the case of the article title."""
     content, timestamp = get_content_and_timestamp(title)
     if title == title.lower() and title in content:
         return title
     start = content.lower().find("'''" + title.replace("_", " ").lower() + "'''")
     if start != -1:
         return content[start + 3 : start + 3 + len(title)]
+
+    return None  # article doesn't contain the title
