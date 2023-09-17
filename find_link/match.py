@@ -333,7 +333,7 @@ def find_link_and_section(q, content, linkto=None):
     raise NoMatch
 
 
-def get_diff(q: str, title: str, linkto: str) -> tuple[str, str]:
+def get_diff(q: str, title: str, linkto: str | None) -> tuple[str, str]:
     content, timestamp = get_content_and_timestamp(title)
     found = find_link_and_section(q, content, linkto)
 
