@@ -145,6 +145,7 @@ def findlink(
         )
 
     check_redirect = not request.args.get("ignore_redirect")
+    error: str
     try:
         redirect_to = get_wiki_info(q) if check_redirect else None
     except MissingPage:
@@ -162,7 +163,8 @@ def findlink(
             current_lang=current_lang,
         )
     except MediawikiError as e:
-        return "Mediawiki error: " + html.escape(e.args[0])
+        error = e.args[0]
+        return "Mediawiki error: " + html.escape(error)
 
     # if redirect_to:
     #     return redirect(url_for('findlink', q=redirect_to.replace(' ', '_')))
@@ -175,7 +177,7 @@ def findlink(
     try:
         ret = do_search(q, redirect_to)
     except MediawikiError as e:
-        error: str = e.args[0]
+        error = e.args[0]
         return "Mediawiki error: " + html.escape(error)
 
     for doc in ret["results"]:
@@ -219,7 +221,7 @@ def newpages() -> str:
 
 
 @bp.route("/find_link/<q>")
-def bad_url(q):
+def bad_url(q: str) -> Response | str:
     return findlink(q)
 
 
