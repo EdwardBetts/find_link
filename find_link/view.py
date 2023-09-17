@@ -1,35 +1,39 @@
 from __future__ import unicode_literals
-import urllib.parse
+
 import html
-from .api import (
-    wiki_redirects,
-    get_wiki_info,
-    api_get,
-    MissingPage,
-    MediawikiError,
-    MultipleRedirects,
-    random_article_list,
-)
-from .util import urlquote, case_flip_first, wiki_space_norm, starts_with_namespace
-from .core import do_search, get_content_and_timestamp
-from .match import NoMatch, find_link_in_content, get_diff, LinkReplace
+import re
+import urllib.parse
+from datetime import datetime
+
 from flask import (
     Blueprint,
     Markup,
-    redirect,
-    request,
-    url_for,
-    render_template,
-    session,
     flash,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
 )
-from datetime import datetime
-from .language import get_langs, get_current_language
-import re
+from werkzeug.wrappers import Response
+
+from .api import (
+    MediawikiError,
+    MissingPage,
+    MultipleRedirects,
+    api_get,
+    get_wiki_info,
+    random_article_list,
+    wiki_redirects,
+)
+from .core import do_search, get_content_and_timestamp
+from .language import get_current_language, get_langs
+from .match import LinkReplace, NoMatch, find_link_in_content, get_diff
+from .util import case_flip_first, starts_with_namespace, urlquote, wiki_space_norm
 
 bp = Blueprint("view", __name__)
 
-re_lang = re.compile("^(" + "|".join(l["code"] for l in get_langs()) + "):(.*)$")
+re_lang = re.compile("^(" + "|".join(lang["code"] for lang in get_langs()) + "):(.*)$")
 
 
 def init_app(app):
@@ -207,7 +211,7 @@ def bad_url(q):
     return findlink(q)
 
 
-def link_replace(title, q, linkto=None):
+def link_replace(title: str, q: str, linkto: str | None = None) -> str:
     current_lang = get_current_language()
     try:
         diff, replacement = get_diff(q, title, linkto)
@@ -228,12 +232,13 @@ def link_replace(title, q, linkto=None):
     )
 
 
-def missing_page(title, q, linkto=None):
+def missing_page(title: str, q: str, linkto: str | None = None) -> str:
     return render_template("missing_page.html", title=title, q=q)
 
 
 @bp.route("/set_lang/<code>")
-def set_lang(code):
+def set_lang(code: str) -> Response:
+    """Update the session with the chosen language."""
     session["current_lang"] = code
     flash("language updated")
     return redirect(url_for(".index", lang=code))
