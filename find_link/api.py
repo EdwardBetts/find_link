@@ -1,4 +1,6 @@
+import collections
 import re
+import typing
 from typing import Any
 
 import requests
@@ -20,42 +22,50 @@ def get_query_url() -> str:
     return f"https://{get_current_language()}.wikipedia.org/w/api.php"
 
 
-sessions = {}
+sessions: dict[str, requests.Session] = {}
+
+CallParams = dict[str, str | int]
 
 
-def get_session():
+def get_session() -> requests.Session:
+    """Get requests.Session for the current language."""
     lang = get_current_language()
     if lang in sessions:
+        assert sessions[lang]
         return sessions[lang]
     s = requests.Session()
-    s.headers = {"User-Agent": ua}
+    s.headers.update({"User-Agent": ua})
     s.mount("https://en.wikipedia.org", HTTPAdapter(max_retries=10))
-    s.params = {
-        "format": "json",
-        "action": "query",
-        "formatversion": 2,
-    }
+    s.params = typing.cast(
+        CallParams,
+        {
+            "format": "json",
+            "action": "query",
+            "formatversion": 2,
+        },
+    )
     sessions[lang] = s
     return s
 
 
 class MediawikiError(Exception):
-    pass
+    """Mediawiki error."""
 
 
 class MultipleRedirects(Exception):
-    pass
+    """Multiple redirects."""
 
 
 class IncompleteReply(Exception):
-    pass
+    """Incomplete reply."""
 
 
 class MissingPage(Exception):
-    pass
+    """Missing page."""
 
 
-def check_for_error(json_data):
+def check_for_error(json_data: dict[str, typing.Any]) -> None:
+    """Check if JSON data contains an error."""
     if "error" in json_data:
         raise MediawikiError(json_data["error"]["info"])
 
@@ -65,13 +75,13 @@ webpage_error = (
 )
 
 
-def api_get(params: dict[str, Any]) -> dict[str, Any]:
+def api_get(params: dict[str, typing.Any]) -> dict[str, Any]:
     """Make call to Wikipedia API."""
     s = get_session()
 
     r = s.get(get_query_url(), params=params)
     try:
-        ret = r.json()
+        ret: dict[str, typing.Any] = r.json()
     except JSONDecodeError:
         if webpage_error in r.text:
             raise MediawikiError(webpage_error)
@@ -81,25 +91,27 @@ def api_get(params: dict[str, Any]) -> dict[str, Any]:
     return ret
 
 
-def get_first_page(params: dict[str, str]) -> dict[str, Any]:
+def get_first_page(params: dict[str, str]) -> dict[str, typing.Any]:
     """Run Wikipedia API query and return the first page."""
-    page = api_get(params)["query"]["pages"][0]
+    page: dict[str, typing.Any] = api_get(params)["query"]["pages"][0]
     if page.get("missing"):
         raise MissingPage
     return page
 
 
-def random_article_list(limit=50):
+def random_article_list(limit: int = 50) -> list[dict[str, typing.Any]]:
+    """Random list of articles."""
     params = {
         "list": "random",
         "rnnamespace": "0",
         "rnlimit": limit,
     }
 
-    return api_get(params)["query"]["random"]
+    return typing.cast(list[dict[str, typing.Any]], api_get(params)["query"]["random"])
 
 
-def wiki_search(q):
+def wiki_search(q: str) -> tuple[int, list[dict[str, typing.Any]]]:
+    """Run search on Wikipedia."""
     m = re_disambig.match(q)
     if m:
         search = '"{}" AND "{}"'.format(*m.groups())
@@ -126,7 +138,7 @@ def wiki_search(q):
     return (totalhits, results)
 
 
-def get_wiki_info(q):
+def get_wiki_info(q: str):
     params = {
         "prop": "info",
         "redirects": "",
@@ -235,7 +247,8 @@ def find_disambig(titles: list[str]) -> list[str]:
     return disambig
 
 
-def wiki_redirects(q):  # pages that link here
+def wiki_redirects(q: str) -> collections.abc.Iterator[str]:  # pages that link here
+    """Find redirects to this article."""
     params = {
         "list": "backlinks",
         "blfilterredir": "redirects",
@@ -269,7 +282,8 @@ def wiki_backlink(q: str) -> tuple[set[str], set[str]]:
     return (articles, redirects)
 
 
-def call_get_diff(title, section_num, section_text):
+def call_get_diff(title: str, section_num: int, section_text: str):
+    """Get edit diff."""
     data = {
         "prop": "revisions",
         "rvprop": "timestamp",
