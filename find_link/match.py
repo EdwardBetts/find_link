@@ -75,7 +75,8 @@ def parse_cite(text: str) -> collections.abc.Iterator[tuple[str, str]]:
 re_heading = re.compile(r"^\s*(=+)\s*(.+)\s*\1(<!--.*-->|\s)*$")
 
 
-def section_iter(text):
+def section_iter(text: str) -> collections.abc.Iterator[tuple[str | None, str]]:
+    """Iterate through an article section."""
     cur_section = ""
     heading = None
     in_comment = False
@@ -96,8 +97,8 @@ def section_iter(text):
     yield (heading, cur_section)
 
 
-def get_subsections(text, section_num):
-    "retrieve the text of subsections for a given section number within an article"
+def get_subsections(text: str, section_num: int) -> str:
+    """Retrieve the text of subsections for a given section number within an article."""
     found = ""
     collection_level = None
     for num, (heading, body) in enumerate(section_iter(text)):
@@ -105,12 +106,14 @@ def get_subsections(text, section_num):
             level = 0
         else:
             m = re_heading.match(heading)
+            assert m
             level = len(m.group(1))
         if num == section_num:
             collection_level = level
             continue
         if collection_level:
             if level > collection_level:
+                assert heading
                 found += heading + body
             else:
                 break
