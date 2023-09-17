@@ -254,13 +254,6 @@ def find_link_in_chunk(
     return (new_content, replacement, found_text_to_link)
 
 
-def find_link_in_text(q: str, content: str) -> tuple[str, str]:
-    (new_content, replacement) = find_link_in_chunk(q, content)
-    if replacement:
-        return (new_content, replacement)
-    raise NoMatch
-
-
 def find_link_in_content(
     q: str, content: str, linkto: str | None = None
 ) -> tuple[str, str, str | None]:
