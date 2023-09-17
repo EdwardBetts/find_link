@@ -5,6 +5,7 @@ import re
 import urllib.parse
 from datetime import datetime
 
+import flask
 from flask import (
     Blueprint,
     Markup,
@@ -36,11 +37,12 @@ bp = Blueprint("view", __name__)
 re_lang = re.compile("^(" + "|".join(lang["code"] for lang in get_langs()) + "):(.*)$")
 
 
-def init_app(app):
+def init_app(app: flask.Flask) -> None:
+    """Initialise application."""
     app.register_blueprint(bp)
 
 
-def get_page(title, q, linkto=None):
+def get_page(title: str, q: str, linkto: str | None = None) -> str | None:
     content, timestamp = get_content_and_timestamp(title)
     timestamp = "".join(c for c in timestamp if c.isdigit())
     current_lang = get_current_language()
@@ -189,12 +191,14 @@ def findlink(q, title=None, message=None):
 
 
 @bp.route("/favicon.ico")
-def favicon():
+def favicon() -> Response:
+    """Favicon."""
     return redirect(url_for("static", filename="Link_edit.png"))
 
 
 @bp.route("/new_pages")
-def newpages():
+def newpages() -> str:
+    """List of new pages."""
     params = {
         "list": "recentchanges",
         "rclimit": 50,
