@@ -138,7 +138,8 @@ def wiki_search(q: str) -> tuple[int, list[dict[str, typing.Any]]]:
     return (totalhits, results)
 
 
-def get_wiki_info(q: str):
+def get_wiki_info(q: str) -> str | None:
+    """Get destination of redirect."""
     params = {
         "prop": "info",
         "redirects": "",
@@ -265,7 +266,7 @@ def wiki_backlink(q: str) -> tuple[set[str], set[str]]:
     return (articles, redirects)
 
 
-def call_get_diff(title: str, section_num: int, section_text: str):
+def call_get_diff(title: str, section_num: int, section_text: str) -> str:
     """Get edit diff."""
     data = {
         "prop": "revisions",
@@ -278,4 +279,5 @@ def call_get_diff(title: str, section_num: int, section_text: str):
     s = get_session()
     ret = s.post(get_query_url(), data=data).json()
     check_for_error(ret)
-    return ret["query"]["pages"][0]["revisions"][0]["diff"]["body"]
+    diff: str = ret["query"]["pages"][0]["revisions"][0]["diff"]["body"]
+    return diff

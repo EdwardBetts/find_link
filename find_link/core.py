@@ -2,6 +2,7 @@
 
 import html
 import re
+import typing
 from typing import Any
 
 from .api import (
@@ -110,7 +111,8 @@ def match_type(q: str, snippet: str) -> str | None:
     return match
 
 
-def do_search(q: str, redirect_to: str) -> dict[str, Any]:
+def do_search(q: str, redirect_to: str | None) -> dict[str, typing.Any]:
+    """Run search."""
     this_title = q[0].upper() + q[1:]
 
     totalhits, search = wiki_search(q)

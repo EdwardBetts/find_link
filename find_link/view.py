@@ -2,6 +2,7 @@ from __future__ import unicode_literals
 
 import html
 import re
+import typing
 import urllib.parse
 from datetime import datetime
 
@@ -70,7 +71,8 @@ def get_page(title: str, q: str, linkto: str | None = None) -> str | None:
 
 
 @bp.route("/random")
-def random_article():
+def random_article() -> Response:
+    """Select a random article."""
     while True:
         random_list = random_article_list()
         for article in random_list:
@@ -81,7 +83,8 @@ def random_article():
 
 
 @bp.route("/diff")
-def diff_view():
+def diff_view() -> Response | str:
+    """Show a diff."""
     q = request.args.get("q")
     title = request.args.get("title")
     linkto = request.args.get("linkto")
@@ -97,7 +100,8 @@ def diff_view():
     return "<table>" + diff + "</table>"
 
 
-def lang_from_q(q):
+def lang_from_q(q: str) -> str:
+    """Read language from article title."""
     m = re_lang.match(q)
     if not m:
         return q
@@ -105,16 +109,19 @@ def lang_from_q(q):
     return m.group(2)
 
 
-def lang_from_request():
+def lang_from_request() -> None:
+    """Read language from 'lang' URL argument."""
     langs = get_langs()
-    valid_languages = {l["code"] for l in langs}
+    valid_languages = {lang["code"] for lang in langs}
     lang_arg = request.args.get("lang")
     if lang_arg and lang_arg.strip().lower() in valid_languages:
         session["current_lang"] = lang_arg.strip()
 
 
 @bp.route("/<path:q>")
-def findlink(q, title=None, message=None):
+def findlink(
+    q: str, title: str | None = None, message: str | None = None
+) -> Response | str:
     if ":" in q:
         q = lang_from_q(q)
     lang_from_request()
@@ -168,7 +175,8 @@ def findlink(q, title=None, message=None):
     try:
         ret = do_search(q, redirect_to)
     except MediawikiError as e:
-        return "Mediawiki error: " + html.escape(e.args[0])
+        error: str = e.args[0]
+        return "Mediawiki error: " + html.escape(error)
 
     for doc in ret["results"]:
         doc["snippet"] = Markup(doc["snippet"])
@@ -249,9 +257,11 @@ def set_lang(code: str) -> Response:
 
 
 @bp.route("/")
-def index():
+def index() -> Response | str:
+    """Index page."""
     if "oauth_verifier" in request.args and "oauth_token" in request.args:
-        return redirect(b"http://localhost:8000/?" + request.query_string)
+        dest = b"http://localhost:8000/?" + request.query_string
+        return redirect(dest.decode("utf-8"))
 
     langs = get_langs()
     title = request.args.get("title")
@@ -295,7 +305,7 @@ def index():
                 q.replace(" ", "_"), title=title, message=q + " not in " + title
             )
     except MediawikiError as e:
-        return "MediaWiki error: " + e.args[0]
+        return "MediaWiki error: " + typing.cast(str, e.args[0])
     if q:
         return redirect(url_for(".findlink", q=q.replace(" ", "_").strip("_")))
     return render_template("index.html", langs=langs, current_lang=current_lang)

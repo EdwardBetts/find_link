@@ -2,6 +2,7 @@ from __future__ import unicode_literals
 
 import collections
 import re
+import typing
 
 from .api import MissingPage, call_get_diff, get_wiki_info
 from .core import get_case_from_content, get_content_and_timestamp
@@ -120,7 +121,7 @@ def get_subsections(text: str, section_num: int) -> str:
     return found
 
 
-def match_found(m, q, linkto):
+def match_found(m: re.Match[str], q: str, linkto: str | None) -> str:
     if q[1:] == m.group(0)[1:]:
         replacement = m.group(1) + q[1:]
     elif any(c.isupper() for c in q[1:]) or m.group(0) == m.group(0).upper():
@@ -139,10 +140,11 @@ def match_found(m, q, linkto):
         elif replacement[0].isupper():
             linkto = linkto[0].upper() + linkto[1:]
         replacement = linkto + "|" + replacement
+    assert isinstance(replacement, str)
     return replacement
 
 
-def parse_links(text):
+def parse_links(text: str) -> collections.abc.Iterator[tuple[str, str]]:
     prev = 0
     for m in re_link_in_text.finditer(text):
         if prev != m.start():
@@ -159,29 +161,35 @@ def parse_links(text):
         yield ("text", text[prev:])
 
 
-def mk_link_matcher(q):
+def mk_link_matcher(q: str) -> typing.Callable[[str], re.Match[str] | None]:
+    """Make a link matcher."""
     re_links = [p(q) for p in patterns]
 
-    def search_for_link(text):
+    def search_for_link(text: str) -> re.Match[str] | None:
         for re_link in re_links:
             m = re_link.search(text)
             if m and m.group(0).count("[[") < 4:
                 return m
 
+        return None
+
     return search_for_link
 
 
-def add_link(m, replacement, text):
-    return m.re.sub(lambda m: "[[%s]]" % replacement, text, count=1)
+def add_link(m: re.Match[str], replacement: str, text: str) -> str:
+    """Add link to text."""
+    return m.re.sub(lambda m: f"[[{replacement}]]", text, count=1)
 
 
-def find_link_in_chunk(q, content, linkto=None):
+def find_link_in_chunk(
+    q: str, content: str, linkto: str | None = None
+) -> tuple[str, str | None, str | None]:
     search_for_link = mk_link_matcher(q)
     new_content = ""
     replacement = None
 
     match_in_non_link = False
-    bad_link_match = False
+    bad_link_match: bool = False
     found_text_to_link = None
 
     for token_type, text in parse_links(content):
@@ -204,7 +212,7 @@ def find_link_in_chunk(q, content, linkto=None):
             if m and (not link_dest or not link_dest.startswith("#")):
                 lc_alpha_q = lc_alpha(q)
 
-                bad_link_match = (
+                bad_link_match = bool(
                     link_dest
                     and len(link_dest) > len(q)
                     and (lc_alpha_q not in lc_alpha(link_dest))
@@ -241,18 +249,21 @@ def find_link_in_chunk(q, content, linkto=None):
                 m = re_extend.search(content)
                 if m and m.end() > m_end:
                     replacement += content[m_end : m.end()]
+                    assert replacement
                     new_content = add_link(m, replacement, content)
     return (new_content, replacement, found_text_to_link)
 
 
-def find_link_in_text(q, content):
+def find_link_in_text(q: str, content: str) -> tuple[str, str]:
     (new_content, replacement) = find_link_in_chunk(q, content)
     if replacement:
         return (new_content, replacement)
     raise NoMatch
 
 
-def find_link_in_content(q, content, linkto=None):
+def find_link_in_content(
+    q: str, content: str, linkto: str | None = None
+) -> tuple[str, str, str | None]:
     if linkto:
         try:
             return find_link_in_content(linkto, content)
@@ -280,7 +291,12 @@ def find_link_in_content(q, content, linkto=None):
     raise LinkReplace if link_replace else NoMatch
 
 
-def find_link_and_section(q, content, linkto=None):
+FindLinkResult = dict[str, str | int]
+
+
+def find_link_and_section(
+    q: str, content: str, linkto: str | None = None
+) -> FindLinkResult:
     if linkto:
         try:
             return find_link_and_section(linkto, content)
@@ -291,7 +307,7 @@ def find_link_and_section(q, content, linkto=None):
 
     search_for_link = mk_link_matcher(q)
 
-    found = {}
+    found: FindLinkResult = {}
 
     for section_num, (header, section_text) in enumerate(sections):
         new_content = ""
@@ -339,6 +355,10 @@ def find_link_and_section(q, content, linkto=None):
 def get_diff(q: str, title: str, linkto: str | None) -> tuple[str, str]:
     content, timestamp = get_content_and_timestamp(title)
     found = find_link_and_section(q, content, linkto)
+
+    assert isinstance(found["section_num"], int)
+    assert isinstance(found["section_text"], str)
+    assert isinstance(found["replacement"], str)
 
     section_text = found["section_text"] + get_subsections(
         content, found["section_num"]
