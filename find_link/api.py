@@ -197,23 +197,6 @@ def categorymembers(q: str) -> list[str]:
     return [i["title"] for i in ret["categorymembers"] if i["title"] != q]
 
 
-def page_links(titles):  # unused
-    titles = list(titles)
-    assert titles
-    params = {
-        "prop": "links",
-        "pllimit": 500,
-        "plnamespace": 0,
-        "titles": "|".join(titles),
-    }
-    ret = api_get(params)["query"]
-    return dict(
-        (doc["title"], {l["title"] for l in doc["links"]})
-        for doc in ret["pages"].values()
-        if "links" in doc
-    )
-
-
 def find_disambig(titles: list[str]) -> list[str]:
     """Find disambiguation articles in the given list of titles."""
     titles = list(titles)
