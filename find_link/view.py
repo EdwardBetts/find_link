@@ -28,7 +28,7 @@ from .api import (
     random_article_list,
     wiki_redirects,
 )
-from .core import do_search, get_content_and_timestamp
+from .core import do_search, get_case_from_content, get_content_and_timestamp
 from .language import get_current_language, get_langs
 from .match import LinkReplace, NoMatch, find_link_in_content, get_diff
 from .util import case_flip_first, starts_with_namespace, urlquote, wiki_space_norm
@@ -174,6 +174,8 @@ def findlink(
         elif q[0].islower():
             redirect_to = redirect_to[0].lower() + redirect_to[1:]
 
+    if redirect_to:
+        redirect_to = get_case_from_content(redirect_to)
     try:
         ret = do_search(q, redirect_to)
     except MediawikiError as e:
