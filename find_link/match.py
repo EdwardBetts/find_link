@@ -58,15 +58,18 @@ class NoMatch(Exception):
     """No match found."""
 
 
-re_cite = re.compile(
-    r"<ref( [^>]*?)?>\s*({{cite.*?}}|\[https?://[^]]*?\])\s*</ref>", re.I | re.S
+re_cite_or_short_description = re.compile(
+    r"(?:{{Short description|(.*?)}}|<ref( [^>]*?)?>\s*({{cite.*?}}|\[https?://[^]]*?\])\s*</ref>)",
+    re.I | re.S,
 )
 
 
-def parse_cite(text: str) -> collections.abc.Iterator[tuple[str, str]]:
+def parse_cite_or_short_descripton(
+    text: str,
+) -> collections.abc.Iterator[tuple[str, str]]:
     """Parse a citation."""
     prev = 0
-    for m in re_cite.finditer(text):
+    for m in re_cite_or_short_description.finditer(text):
         yield ("text", text[prev : m.start()])
         yield ("cite", m.group(0))
         prev = m.end()
@@ -268,7 +271,7 @@ def find_link_in_content(
     for header, section_text in section_iter(content):
         if header:
             new_content += header
-        for token_type, text in parse_cite(section_text):
+        for token_type, text in parse_cite_or_short_descripton(section_text):
             if token_type == "text" and not replacement:
                 try:
                     (new_text, replacement, replaced_text) = find_link_in_chunk(
@@ -306,7 +309,7 @@ def find_link_and_section(
         new_content = ""
         if header:
             new_content += header
-        for token_type, text in parse_cite(section_text):
+        for token_type, text in parse_cite_or_short_descripton(section_text):
             if token_type == "text" and not replacement:
                 new_text = ""
                 for token_type2, text2 in parse_links(text):
