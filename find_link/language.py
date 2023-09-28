@@ -9,6 +9,7 @@ langs = [
     ("an", "aragonés", "Aragonese"),
     ("ar", "العربية", "Arabic"),
     ("arz", "مصرى", "Egyptian Arabic"),
+    ("as", "অসমীয়া", "Assamese"),
     ("ast", "asturianu", "Asturian"),
     ("az", "azərbaycanca", "Azerbaijani"),
     ("azb", "تۆرکجه", "Southern Azerbaijani"),
