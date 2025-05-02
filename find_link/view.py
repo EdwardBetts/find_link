@@ -9,7 +9,6 @@ from datetime import datetime
 import flask
 from flask import (
     Blueprint,
-    Markup,
     flash,
     redirect,
     render_template,
@@ -18,6 +17,7 @@ from flask import (
     url_for,
 )
 from werkzeug.wrappers import Response
+from markupsafe import Markup
 
 from .api import (
     MediawikiError,
