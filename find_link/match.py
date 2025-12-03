@@ -59,7 +59,7 @@ class NoMatch(Exception):
 
 
 re_cite_or_short_description = re.compile(
-    r"(?:{{Short description|(.*?)}}|<ref( [^>]*?)?>\s*({{cite.*?}}|\[https?://[^]]*?\])\s*</ref>)",
+    r"(?:{{Short description\|(.*?)}}|<ref( [^>]*?)?>\s*({{cite.*?}}|\[https?://[^]]*?\])\s*</ref>)",
     re.I | re.S,
 )
 
